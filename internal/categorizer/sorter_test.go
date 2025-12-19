@@ -11,9 +11,9 @@ import (
 func TestSortPRs_Oldest(t *testing.T) {
 	now := time.Now()
 	prs := []*models.PR{
-		{Number: 3, CreatedAt: now.Add(-1 * time.Hour)},   // middle
-		{Number: 1, CreatedAt: now.Add(-3 * time.Hour)},   // oldest
-		{Number: 2, CreatedAt: now.Add(-2 * time.Hour)},   // between
+		{Number: 3, CreatedAt: now.Add(-1 * time.Hour)}, // middle
+		{Number: 1, CreatedAt: now.Add(-3 * time.Hour)}, // oldest
+		{Number: 2, CreatedAt: now.Add(-2 * time.Hour)}, // between
 	}
 
 	SortPRs(prs, config.SortOldest)
@@ -30,9 +30,9 @@ func TestSortPRs_Oldest(t *testing.T) {
 func TestSortPRs_Newest(t *testing.T) {
 	now := time.Now()
 	prs := []*models.PR{
-		{Number: 1, CreatedAt: now.Add(-3 * time.Hour)},   // oldest
-		{Number: 3, CreatedAt: now.Add(-1 * time.Hour)},   // newest
-		{Number: 2, CreatedAt: now.Add(-2 * time.Hour)},   // middle
+		{Number: 1, CreatedAt: now.Add(-3 * time.Hour)}, // oldest
+		{Number: 3, CreatedAt: now.Add(-1 * time.Hour)}, // newest
+		{Number: 2, CreatedAt: now.Add(-2 * time.Hour)}, // middle
 	}
 
 	SortPRs(prs, config.SortNewest)
@@ -88,8 +88,8 @@ func TestSortPRs_StableForEqualTimes_Newest(t *testing.T) {
 func TestSortPRs_DefaultsToOldest(t *testing.T) {
 	now := time.Now()
 	prs := []*models.PR{
-		{Number: 2, CreatedAt: now.Add(-1 * time.Hour)},   // newer
-		{Number: 1, CreatedAt: now.Add(-2 * time.Hour)},   // older
+		{Number: 2, CreatedAt: now.Add(-1 * time.Hour)}, // newer
+		{Number: 1, CreatedAt: now.Add(-2 * time.Hour)}, // older
 	}
 
 	SortPRs(prs, "invalid") // invalid should default to oldest

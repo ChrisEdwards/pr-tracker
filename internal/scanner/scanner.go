@@ -5,10 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"prt/internal/config"
 	"prt/internal/models"
 )
+
+// inspectConcurrency is the number of concurrent git remote inspections.
+const inspectConcurrency = 10
 
 // Scanner discovers Git repositories with GitHub remotes.
 type Scanner interface {
@@ -38,8 +42,10 @@ func NewScanner(maxDepth int, includePatterns []string) (Scanner, error) {
 
 // Scan walks the configured search paths and returns all discovered repositories.
 // It respects the maxDepth limit and filters results by the include patterns.
+// Repository inspection (git remote calls) is parallelized for better performance.
 func (s *scanner) Scan(cfg *config.Config) ([]*models.Repository, error) {
-	var repos []*models.Repository
+	// Phase 1: Collect all .git directory paths (fast filesystem walk)
+	var repoPaths []string
 	seen := make(map[string]bool) // Prevent duplicates
 
 	for _, searchPath := range cfg.SearchPaths {
@@ -79,17 +85,8 @@ func (s *scanner) Scan(cfg *config.Config) ([]*models.Repository, error) {
 				}
 				seen[repoPath] = true
 
-				// Inspect the repository
-				repo, err := InspectRepo(repoPath)
-				if err != nil {
-					// Not a valid GitHub repo - skip silently
-					return filepath.SkipDir
-				}
-
-				// Apply filter
-				if s.filter.Matches(repo.Name) {
-					repos = append(repos, repo)
-				}
+				// Collect path for parallel inspection
+				repoPaths = append(repoPaths, repoPath)
 
 				// Don't descend into .git directory
 				return filepath.SkipDir
@@ -121,7 +118,49 @@ func (s *scanner) Scan(cfg *config.Config) ([]*models.Repository, error) {
 		}
 	}
 
-	return repos, nil
+	// Phase 2: Inspect repositories in parallel (slow git remote calls)
+	if len(repoPaths) == 0 {
+		return nil, nil
+	}
+
+	return s.inspectReposParallel(repoPaths), nil
+}
+
+// inspectReposParallel inspects multiple repositories concurrently.
+// It filters results by the configured patterns and returns valid GitHub repos.
+func (s *scanner) inspectReposParallel(paths []string) []*models.Repository {
+	var (
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		repos []*models.Repository
+		sem   = make(chan struct{}, inspectConcurrency)
+	)
+
+	for _, path := range paths {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+
+			sem <- struct{}{}        // Acquire
+			defer func() { <-sem }() // Release
+
+			repo, err := InspectRepo(p)
+			if err != nil {
+				// Not a valid GitHub repo - skip silently
+				return
+			}
+
+			// Apply filter
+			if s.filter.Matches(repo.Name) {
+				mu.Lock()
+				repos = append(repos, repo)
+				mu.Unlock()
+			}
+		}(path)
+	}
+
+	wg.Wait()
+	return repos
 }
 
 // countDepth returns the depth of path relative to base.

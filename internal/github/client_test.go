@@ -499,3 +499,142 @@ func TestListPRs_RetriesOnTransientError(t *testing.T) {
 		t.Error("expected non-nil PRs slice")
 	}
 }
+
+// CheckAndGetUser tests
+
+func TestCheckAndGetUser_GHNotFound(t *testing.T) {
+	c := &client{
+		execLookPath: func(file string) (string, error) {
+			return "", errors.New("executable not found")
+		},
+		execCommand: exec.Command, // Won't be called
+		retryer:     testRetryer(),
+	}
+
+	_, err := c.CheckAndGetUser()
+	if err == nil {
+		t.Fatal("expected error when gh not found")
+	}
+
+	ghErr, ok := err.(*GHNotFoundError)
+	if !ok {
+		t.Fatalf("expected GHNotFoundError, got %T", err)
+	}
+
+	if ghErr.Message == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+func TestCheckAndGetUser_Success(t *testing.T) {
+	c := &client{
+		execLookPath: func(file string) (string, error) {
+			return "/usr/bin/gh", nil
+		},
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Both auth status and api user commands go here
+			if len(arg) >= 2 && arg[0] == "auth" && arg[1] == "status" {
+				return exec.Command("true")
+			}
+			if len(arg) >= 2 && arg[0] == "api" && arg[1] == "user" {
+				return exec.Command("echo", "testuser")
+			}
+			return exec.Command("true")
+		},
+		retryer: testRetryer(),
+	}
+
+	user, err := c.CheckAndGetUser()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if user != "testuser" {
+		t.Errorf("expected 'testuser', got %q", user)
+	}
+}
+
+func TestCheckAndGetUser_AuthFailure(t *testing.T) {
+	c := &client{
+		execLookPath: func(file string) (string, error) {
+			return "/usr/bin/gh", nil
+		},
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Auth fails, user fetch succeeds
+			if len(arg) >= 2 && arg[0] == "auth" && arg[1] == "status" {
+				return exec.Command("false")
+			}
+			if len(arg) >= 2 && arg[0] == "api" && arg[1] == "user" {
+				return exec.Command("echo", "testuser")
+			}
+			return exec.Command("true")
+		},
+		retryer: testRetryer(),
+	}
+
+	_, err := c.CheckAndGetUser()
+	if err == nil {
+		t.Fatal("expected error when auth fails")
+	}
+
+	authErr, ok := err.(*GHAuthError)
+	if !ok {
+		t.Fatalf("expected GHAuthError, got %T", err)
+	}
+
+	if authErr.Message == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+func TestCheckAndGetUser_UserFetchFailure(t *testing.T) {
+	c := &client{
+		execLookPath: func(file string) (string, error) {
+			return "/usr/bin/gh", nil
+		},
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Auth succeeds, user fetch fails
+			if len(arg) >= 2 && arg[0] == "auth" && arg[1] == "status" {
+				return exec.Command("true")
+			}
+			if len(arg) >= 2 && arg[0] == "api" && arg[1] == "user" {
+				return exec.Command("false")
+			}
+			return exec.Command("true")
+		},
+		retryer: testRetryer(),
+	}
+
+	_, err := c.CheckAndGetUser()
+	if err == nil {
+		t.Fatal("expected error when user fetch fails")
+	}
+
+	// Should not be an auth error
+	if _, ok := err.(*GHAuthError); ok {
+		t.Error("expected non-auth error for user fetch failure")
+	}
+}
+
+func TestCheckAndGetUser_EmptyUsername(t *testing.T) {
+	c := &client{
+		execLookPath: func(file string) (string, error) {
+			return "/usr/bin/gh", nil
+		},
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			if len(arg) >= 2 && arg[0] == "auth" && arg[1] == "status" {
+				return exec.Command("true")
+			}
+			if len(arg) >= 2 && arg[0] == "api" && arg[1] == "user" {
+				return exec.Command("echo", "")
+			}
+			return exec.Command("true")
+		},
+		retryer: testRetryer(),
+	}
+
+	_, err := c.CheckAndGetUser()
+	if err == nil {
+		t.Fatal("expected error for empty username")
+	}
+}

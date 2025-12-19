@@ -4,12 +4,14 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"prt/internal/categorizer"
 	"prt/internal/config"
 	"prt/internal/display"
 	"prt/internal/github"
+	"prt/internal/models"
 	"prt/internal/scanner"
 
 	"github.com/spf13/cobra"
@@ -79,30 +81,68 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// 4. Check gh CLI and get client
-	ghClient := github.NewClient()
-	if err := ghClient.Check(); err != nil {
-		return err
-	}
-
-	// 5. Auto-detect username if needed
-	if cfg.GitHubUsername == "" {
-		user, err := ghClient.GetCurrentUser()
-		if err != nil {
-			return fmt.Errorf("cannot determine GitHub username: %w", err)
-		}
-		cfg.GitHubUsername = user
-	}
-
-	// 6. Scan for repositories
+	// 4. Create scanner early (needed for parallel scan)
 	scnr, err := scanner.NewScanner(cfg.ScanDepth, cfg.IncludeRepos)
 	if err != nil {
 		return fmt.Errorf("scanner error: %w", err)
 	}
 
-	repos, err := scnr.Scan(cfg)
-	if err != nil {
-		return fmt.Errorf("scan error: %w", err)
+	// 5. Run gh CLI check and repo scanning in parallel
+	// This saves time by scanning repos while waiting for gh API calls
+	ghClient := github.NewClient()
+	needsUsername := cfg.GitHubUsername == ""
+
+	var wg sync.WaitGroup
+	var ghErr error
+	var scanErr error
+	var repos []*models.Repository
+	var username string
+
+	wg.Add(2)
+
+	// Goroutine A: gh CLI check + optional username fetch
+	go func() {
+		defer wg.Done()
+		if needsUsername {
+			// Combined check + user fetch (parallel internally)
+			user, err := ghClient.CheckAndGetUser()
+			if err != nil {
+				ghErr = err
+				return
+			}
+			username = user
+		} else {
+			// Just check gh CLI
+			if err := ghClient.Check(); err != nil {
+				ghErr = err
+			}
+		}
+	}()
+
+	// Goroutine B: Scan for repositories
+	go func() {
+		defer wg.Done()
+		r, err := scnr.Scan(cfg)
+		if err != nil {
+			scanErr = fmt.Errorf("scan error: %w", err)
+			return
+		}
+		repos = r
+	}()
+
+	wg.Wait()
+
+	// Check for errors (gh errors take priority)
+	if ghErr != nil {
+		return ghErr
+	}
+	if scanErr != nil {
+		return scanErr
+	}
+
+	// Apply username if it was fetched
+	if needsUsername {
+		cfg.GitHubUsername = username
 	}
 
 	if len(repos) == 0 {
@@ -110,16 +150,16 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// 7. Fetch PRs with progress
+	// 6. Fetch PRs with progress
 	// Progress callback is nil for now - will be implemented with progress display
 	github.FetchAllPRs(repos, ghClient, nil)
 
-	// 8. Categorize
+	// 7. Categorize
 	cat := categorizer.NewCategorizer()
 	result := cat.Categorize(repos, cfg, cfg.GitHubUsername)
 	result.ScanDuration = time.Since(startTime)
 
-	// 9. Render output
+	// 8. Render output
 	output, err := display.Render(result, display.RenderOptions{
 		ShowIcons:    cfg.ShowIcons,
 		ShowBranches: cfg.ShowBranchName,

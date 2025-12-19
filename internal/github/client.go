@@ -5,6 +5,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"prt/internal/models"
 )
@@ -18,6 +19,9 @@ type Client interface {
 	Check() error
 	// GetCurrentUser returns the authenticated GitHub username.
 	GetCurrentUser() (string, error)
+	// CheckAndGetUser verifies gh CLI and returns the current user in parallel.
+	// This is faster than calling Check() then GetCurrentUser() sequentially.
+	CheckAndGetUser() (string, error)
 	// ListPRs fetches open PRs for a repository.
 	ListPRs(repoPath string) ([]*models.PR, error)
 }
@@ -99,6 +103,81 @@ func (c *client) GetCurrentUser() (string, error) {
 	username := strings.TrimSpace(string(out))
 	if username == "" {
 		return "", fmt.Errorf("empty username returned from GitHub API")
+	}
+
+	return username, nil
+}
+
+// CheckAndGetUser verifies gh CLI is installed/authenticated and returns
+// the current username in parallel. This is faster than sequential Check()
+// then GetCurrentUser() calls since both gh commands run concurrently.
+func (c *client) CheckAndGetUser() (string, error) {
+	// First, check gh exists (must be done first, can't parallelize)
+	_, err := c.execLookPath("gh")
+	if err != nil {
+		return "", &GHNotFoundError{
+			Message: `GitHub CLI (gh) not found.
+
+Please install it:
+  brew install gh        # macOS
+  sudo apt install gh    # Debian/Ubuntu
+  winget install gh      # Windows
+
+Then authenticate:
+  gh auth login`,
+		}
+	}
+
+	// Run auth check and user fetch in parallel
+	var wg sync.WaitGroup
+	var authErr, userErr error
+	var username string
+
+	wg.Add(2)
+
+	// Auth check goroutine
+	go func() {
+		defer wg.Done()
+		cmd := c.execCommand("gh", "auth", "status")
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+		if err := cmd.Run(); err != nil {
+			authErr = &GHAuthError{
+				Message: `GitHub CLI is not authenticated.
+
+Please run:
+  gh auth login`,
+			}
+		}
+	}()
+
+	// User fetch goroutine
+	go func() {
+		defer wg.Done()
+		cmd := c.execCommand("gh", "api", "user", "--jq", ".login")
+		out, err := cmd.Output()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				userErr = fmt.Errorf("failed to get current user: %s", strings.TrimSpace(string(exitErr.Stderr)))
+			} else {
+				userErr = fmt.Errorf("failed to get current user: %w", err)
+			}
+			return
+		}
+		username = strings.TrimSpace(string(out))
+		if username == "" {
+			userErr = fmt.Errorf("empty username returned from GitHub API")
+		}
+	}()
+
+	wg.Wait()
+
+	// Auth errors take priority since they indicate fundamental issues
+	if authErr != nil {
+		return "", authErr
+	}
+	if userErr != nil {
+		return "", userErr
 	}
 
 	return username, nil

@@ -23,6 +23,10 @@ func (m *mockClient) GetCurrentUser() (string, error) {
 	return "testuser", nil
 }
 
+func (m *mockClient) CheckAndGetUser() (string, error) {
+	return "testuser", nil
+}
+
 func (m *mockClient) ListPRs(repoPath string) ([]*models.PR, error) {
 	if m.listPRsFunc != nil {
 		return m.listPRsFunc(repoPath)
