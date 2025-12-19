@@ -1,6 +1,7 @@
 package display
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,13 +21,13 @@ func testPR(number int, title string) *models.PR {
 	return &models.PR{
 		Number:     number,
 		Title:      title,
-		URL:        "https://github.com/org/repo/pull/" + itoa(number),
+		URL:        "https://github.com/org/repo/pull/" + strconv.Itoa(number),
 		Author:     "testuser",
 		State:      models.PRStateOpen,
 		IsDraft:    false,
 		CreatedAt:  time.Now().Add(-24 * time.Hour),
 		BaseBranch: "main",
-		HeadBranch: "feature-" + itoa(number),
+		HeadBranch: "feature-" + strconv.Itoa(number),
 		CIStatus:   models.CIStatusPassing,
 	}
 }
@@ -327,9 +328,9 @@ func TestItoa(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := itoa(tt.input)
+		got := strconv.Itoa(tt.input)
 		if got != tt.want {
-			t.Errorf("itoa(%d) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("strconv.Itoa(%d) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
@@ -415,7 +416,7 @@ func TestRenderStackTree_ComplexTree(t *testing.T) {
 
 	// All PRs should be present
 	for i := 1; i <= 4; i++ {
-		if !strings.Contains(result, "#"+itoa(i)) {
+		if !strings.Contains(result, "#"+strconv.Itoa(i)) {
 			t.Errorf("expected PR #%d in output", i)
 		}
 	}

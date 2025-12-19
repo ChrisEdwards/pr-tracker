@@ -8,7 +8,7 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION)"
 BIN_DIR = bin
 BINARY = $(BIN_DIR)/prt
 
-.PHONY: build test test-coverage clean install lint fmt help
+.PHONY: build test test-coverage clean install release lint fmt help
 
 ## build: Build binary to bin/prt
 build:
@@ -32,6 +32,16 @@ clean:
 ## install: Install binary to /usr/local/bin
 install: build
 	cp $(BINARY) /usr/local/bin/prt
+
+## release: Build for all platforms (darwin, linux)
+release: clean
+	@echo "Building releases for version $(VERSION)..."
+	@mkdir -p $(BIN_DIR)
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BIN_DIR)/prt-darwin-amd64 ./cmd/prt
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BIN_DIR)/prt-darwin-arm64 ./cmd/prt
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BIN_DIR)/prt-linux-amd64 ./cmd/prt
+	@echo "Release binaries:"
+	@ls -la $(BIN_DIR)/
 
 ## lint: Run golangci-lint (if available)
 lint:
