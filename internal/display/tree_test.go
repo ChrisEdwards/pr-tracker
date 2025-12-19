@@ -313,28 +313,6 @@ func TestRenderBlockedIndicator(t *testing.T) {
 	})
 }
 
-func TestItoa(t *testing.T) {
-	tests := []struct {
-		input int
-		want  string
-	}{
-		{0, "0"},
-		{1, "1"},
-		{10, "10"},
-		{123, "123"},
-		{999, "999"},
-		{-1, "-1"},
-		{-123, "-123"},
-	}
-
-	for _, tt := range tests {
-		got := strconv.Itoa(tt.input)
-		if got != tt.want {
-			t.Errorf("strconv.Itoa(%d) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}
-
 func TestRenderStackTree_BlockedPR(t *testing.T) {
 	setupTreeTest(t)
 

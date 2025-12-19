@@ -57,6 +57,7 @@ func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config,
 		// Categorize each PR
 		for _, pr := range repo.PRs {
 			pr.RepoName = repo.Name
+			pr.RepoOwner = repo.Owner
 			pr.RepoPath = repo.Path
 
 			// Compute user-specific fields

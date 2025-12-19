@@ -82,8 +82,17 @@ type PR struct {
 	MyReviewStatus          ReviewState `json:"my_review_status"`
 
 	// Repository context (set during aggregation)
-	RepoName string `json:"repo_name"`
-	RepoPath string `json:"repo_path"`
+	RepoName  string `json:"repo_name"`
+	RepoOwner string `json:"repo_owner"`
+	RepoPath  string `json:"repo_path"`
+}
+
+// RepoFullName returns the repository's full name in "owner/name" format.
+func (pr *PR) RepoFullName() string {
+	if pr.RepoOwner == "" {
+		return pr.RepoName
+	}
+	return pr.RepoOwner + "/" + pr.RepoName
 }
 
 // Age returns the duration since the PR was created.

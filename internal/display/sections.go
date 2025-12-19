@@ -90,11 +90,11 @@ func isPRBlocked(pr *models.PR, stack *models.Stack) bool {
 	return false
 }
 
-// groupByRepo groups PRs by their repository name.
+// groupByRepo groups PRs by their repository full name (owner/repo).
 func groupByRepo(prs []*models.PR) map[string][]*models.PR {
 	result := make(map[string][]*models.PR)
 	for _, pr := range prs {
-		result[pr.RepoName] = append(result[pr.RepoName], pr)
+		result[pr.RepoFullName()] = append(result[pr.RepoFullName()], pr)
 	}
 	return result
 }

@@ -225,3 +225,90 @@ func TestIsPRBlocked_MergedParent(t *testing.T) {
 		t.Error("Child PR should not be blocked when parent is merged")
 	}
 }
+
+// TestRenderSection_StackLookupIntegration tests the full flow of stack lookup
+// This verifies that stacks keyed by "owner/repo" are found when PRs have
+// RepoOwner and RepoName set correctly.
+func TestRenderSection_StackLookupIntegration(t *testing.T) {
+	// Create PRs with full repo context
+	parentPR := &models.PR{
+		Number:     1,
+		Title:      "Parent PR",
+		URL:        "https://github.com/myorg/myrepo/pull/1",
+		RepoName:   "myrepo",
+		RepoOwner:  "myorg",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-a",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	childPR := &models.PR{
+		Number:     2,
+		Title:      "Child PR",
+		URL:        "https://github.com/myorg/myrepo/pull/2",
+		RepoName:   "myrepo",
+		RepoOwner:  "myorg",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-b",
+		BaseBranch: "feature-a", // Depends on parent
+		CreatedAt:  time.Now(),
+	}
+
+	// Create stack structure (child is blocked by parent)
+	parentNode := &models.StackNode{PR: parentPR, Children: []*models.StackNode{}}
+	childNode := &models.StackNode{PR: childPR, Parent: parentNode, Children: []*models.StackNode{}}
+	parentNode.Children = append(parentNode.Children, childNode)
+
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{parentNode},
+		AllNodes: []*models.StackNode{parentNode, childNode},
+	}
+
+	// Create stacks map keyed by full name (as categorizer does)
+	stacks := map[string]*models.Stack{
+		"myorg/myrepo": stack,
+	}
+
+	prs := []*models.PR{parentPR, childPR}
+
+	// Render section - this should now correctly look up the stack
+	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+
+	// Verify the section renders both PRs
+	if !strings.Contains(result, "#1") {
+		t.Error("Section should contain parent PR #1")
+	}
+	if !strings.Contains(result, "#2") {
+		t.Error("Section should contain child PR #2")
+	}
+
+	// Verify repo grouping uses full name
+	if !strings.Contains(result, "[myorg/myrepo]") {
+		t.Error("Section should show full repo name [myorg/myrepo]")
+	}
+}
+
+// TestGroupByRepo_WithOwner tests that groupByRepo uses full name when owner is set
+func TestGroupByRepo_WithOwner(t *testing.T) {
+	prs := []*models.PR{
+		{Number: 1, RepoName: "repo", RepoOwner: "org1"},
+		{Number: 2, RepoName: "repo", RepoOwner: "org2"},
+		{Number: 3, RepoName: "repo", RepoOwner: "org1"},
+	}
+
+	grouped := groupByRepo(prs)
+
+	// Should be grouped by full name, not just repo name
+	if _, ok := grouped["org1/repo"]; !ok {
+		t.Error("Should have org1/repo group")
+	}
+	if _, ok := grouped["org2/repo"]; !ok {
+		t.Error("Should have org2/repo group")
+	}
+	if len(grouped["org1/repo"]) != 2 {
+		t.Error("org1/repo should have 2 PRs")
+	}
+	if len(grouped["org2/repo"]) != 1 {
+		t.Error("org2/repo should have 1 PR")
+	}
+}

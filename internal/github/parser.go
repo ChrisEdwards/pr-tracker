@@ -90,6 +90,7 @@ func convertPR(gpr ghPR) (*models.PR, error) {
 	for i, r := range gpr.Reviews {
 		var submitted time.Time
 		if r.SubmittedAt != "" {
+			// Parse review timestamp; use zero time if malformed (rare edge case)
 			submitted, _ = time.Parse(time.RFC3339, r.SubmittedAt)
 		}
 		reviews[i] = models.Review{

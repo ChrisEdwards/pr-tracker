@@ -75,6 +75,7 @@ func (o *Orchestrator) FetchAllPRs(repos []*models.Repository, progress FetchPro
 				// Set repo context on each PR
 				for _, pr := range prs {
 					pr.RepoName = r.Name
+					pr.RepoOwner = r.Owner
 					pr.RepoPath = r.Path
 				}
 			}
