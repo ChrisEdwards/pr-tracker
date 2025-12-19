@@ -2,10 +2,64 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+// ValidationError holds multiple configuration validation errors.
+type ValidationError struct {
+	Errors []string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("configuration errors:\n  - %s", strings.Join(e.Errors, "\n  - "))
+}
+
+// Validate checks the configuration and returns an error if invalid.
+// Error messages are designed to be actionable and helpful.
+func (c *Config) Validate() error {
+	var errs []string
+
+	// Username required
+	if c.GitHubUsername == "" {
+		errs = append(errs, "github_username is required (set in config or via gh CLI auto-detect)")
+	}
+
+	// At least one search path required
+	if len(c.SearchPaths) == 0 {
+		errs = append(errs, "at least one search_path is required")
+	}
+
+	// Validate search paths exist
+	for _, path := range c.SearchPaths {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			errs = append(errs, fmt.Sprintf("search path does not exist: %s", path))
+		}
+	}
+
+	// Valid group_by value
+	if !IsValidGroupBy(c.DefaultGroupBy) {
+		errs = append(errs, fmt.Sprintf("invalid default_group_by: %q (must be %q or %q)", c.DefaultGroupBy, GroupByProject, GroupByAuthor))
+	}
+
+	// Valid sort value
+	if !IsValidSort(c.DefaultSort) {
+		errs = append(errs, fmt.Sprintf("invalid default_sort: %q (must be %q or %q)", c.DefaultSort, SortOldest, SortNewest))
+	}
+
+	// Scan depth must be positive
+	if c.ScanDepth < 1 {
+		errs = append(errs, "scan_depth must be at least 1")
+	}
+
+	if len(errs) > 0 {
+		return &ValidationError{Errors: errs}
+	}
+
+	return nil
+}
 
 // Flags holds CLI flag values that can override config.
 type Flags struct {
@@ -92,8 +146,8 @@ func LoadDefault() *Config {
 // NeedsSetup returns true if the config is missing required fields
 // that should trigger the first-run wizard.
 func NeedsSetup(cfg *Config) bool {
-	// Config needs setup if no search paths are configured
-	return len(cfg.SearchPaths) == 0
+	// Config needs setup if no search paths or no GitHub username
+	return len(cfg.SearchPaths) == 0 || cfg.GitHubUsername == ""
 }
 
 // ConfigFileExists returns true if a config file exists at the default path.
