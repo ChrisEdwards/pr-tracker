@@ -72,6 +72,9 @@ func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config,
 
 	result.TotalReposScanned = len(repos)
 
+	// Sort all categories by creation date
+	SortResult(result, cfg.DefaultSort)
+
 	return result
 }
 
