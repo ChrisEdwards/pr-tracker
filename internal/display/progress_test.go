@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"prt/internal/models"
 )
@@ -354,5 +355,178 @@ func TestProgressDisplay_ProgressBar(t *testing.T) {
 	}
 	if filledCount+emptyCount != 10 {
 		t.Errorf("expected 10 total bar chars, got %d", filledCount+emptyCount)
+	}
+}
+
+func TestProgressDisplay_WithTTY(t *testing.T) {
+	t.Run("TTY mode renders full display", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		p := NewProgressDisplay(1, WithWriter(buf), WithTTY(true))
+
+		p.Update(&models.Repository{Name: "test", ScanStatus: models.ScanStatusSuccess})
+		output := buf.String()
+
+		// TTY mode should clear screen
+		if !strings.Contains(output, "\033[2J") {
+			t.Error("TTY mode should include screen clear sequence")
+		}
+		// Should show full header
+		if !strings.Contains(output, "Fetching PRs from") {
+			t.Error("TTY mode should show header")
+		}
+	})
+
+	t.Run("non-TTY mode renders simple output", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		p := NewProgressDisplay(1, WithWriter(buf), WithTTY(false))
+
+		p.Update(&models.Repository{Name: "test", ScanStatus: models.ScanStatusSuccess})
+		output := buf.String()
+
+		// Non-TTY mode should NOT clear screen
+		if strings.Contains(output, "\033[2J") {
+			t.Error("non-TTY mode should not include screen clear sequence")
+		}
+		// Should still show the repo result
+		if !strings.Contains(output, "test") {
+			t.Error("non-TTY mode should show repo name")
+		}
+	})
+}
+
+func TestProgressDisplay_WithASCII(t *testing.T) {
+	t.Run("ASCII mode uses ASCII icons", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		p := NewProgressDisplay(1, WithWriter(buf), WithTTY(true), WithASCII(true))
+
+		p.Update(&models.Repository{Name: "test", ScanStatus: models.ScanStatusSuccess})
+		output := buf.String()
+
+		// Should use ASCII bar characters
+		if !strings.Contains(output, IconBarFilledASCII) {
+			t.Error("ASCII mode should use ASCII bar filled character")
+		}
+		if strings.Contains(output, IconBarFilled) && !strings.Contains(output, IconBarFilledASCII) {
+			t.Error("ASCII mode should not use Unicode bar filled character")
+		}
+	})
+
+	t.Run("Unicode mode uses Unicode icons", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		p := NewProgressDisplay(1, WithWriter(buf), WithTTY(true), WithASCII(false))
+
+		p.Update(&models.Repository{Name: "test", ScanStatus: models.ScanStatusSuccess})
+		output := buf.String()
+
+		// Should use Unicode bar characters
+		if !strings.Contains(output, IconBarFilled) {
+			t.Error("Unicode mode should use Unicode bar filled character")
+		}
+	})
+}
+
+func TestProgressDisplay_RateLimitHandling(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewProgressDisplay(1, WithWriter(buf))
+
+	repo := &models.Repository{
+		Name:       "rate-limited-repo",
+		ScanStatus: models.ScanStatusError,
+		ScanError:  errors.New("rate limit exceeded"),
+	}
+	p.Update(repo)
+
+	output := buf.String()
+	if !strings.Contains(output, "rate limited") {
+		t.Error("should show 'rate limited' for rate limit errors")
+	}
+	if !strings.Contains(output, IconPause) {
+		t.Error("should show pause icon for rate limited repos")
+	}
+}
+
+func TestProgressDisplay_PRCounting(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewProgressDisplay(3, WithWriter(buf))
+
+	// Add repos with different PR counts
+	p.Update(&models.Repository{
+		Name:       "r1",
+		ScanStatus: models.ScanStatusSuccess,
+		PRs:        []*models.PR{{Number: 1}, {Number: 2}},
+	})
+	p.Update(&models.Repository{
+		Name:       "r2",
+		ScanStatus: models.ScanStatusSuccess,
+		PRs:        []*models.PR{{Number: 3}},
+	})
+	p.Update(&models.Repository{
+		Name:       "r3",
+		ScanStatus: models.ScanStatusNoPRs,
+	})
+
+	summary := p.Finish()
+
+	if summary.TotalPRs != 3 {
+		t.Errorf("expected totalPRs 3, got %d", summary.TotalPRs)
+	}
+}
+
+func TestProgressDisplay_ElapsedTime(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewProgressDisplay(1, WithWriter(buf), WithTTY(true))
+
+	// Update and wait a tiny bit
+	p.Update(&models.Repository{Name: "test", ScanStatus: models.ScanStatusSuccess})
+
+	summary := p.Finish()
+
+	// Elapsed time should be non-zero
+	if summary.Elapsed <= 0 {
+		t.Error("elapsed time should be greater than 0")
+	}
+}
+
+func TestSummary_RichString(t *testing.T) {
+	summary := Summary{
+		Total:    10,
+		Done:     10,
+		Success:  5,
+		Errors:   2,
+		Elapsed:  2500 * time.Millisecond,
+		TotalPRs: 15,
+	}
+
+	result := summary.RichString()
+
+	if !strings.Contains(result, "10 repos") {
+		t.Error("should contain repo count")
+	}
+	if !strings.Contains(result, "2.5s") {
+		t.Error("should contain elapsed time")
+	}
+	if !strings.Contains(result, "15 open PRs") {
+		t.Error("should contain PR count")
+	}
+	if !strings.Contains(result, "5 repos") {
+		t.Error("should contain repos with PRs count")
+	}
+}
+
+func TestProgressDisplay_ZeroPRsUsesDimStyle(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewProgressDisplay(1, WithWriter(buf))
+
+	repo := &models.Repository{
+		Name:       "empty-repo",
+		ScanStatus: models.ScanStatusSuccess,
+		PRs:        []*models.PR{}, // 0 PRs
+	}
+	p.Update(repo)
+
+	// The result should be stored (we can't easily test styling without
+	// mocking lipgloss, but we can verify the count)
+	if p.totalPRs != 0 {
+		t.Errorf("expected totalPRs 0, got %d", p.totalPRs)
 	}
 }

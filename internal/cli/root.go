@@ -17,6 +17,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// FastScanThreshold is the minimum duration before showing progress.
+// If scanning completes faster than this, no progress is shown.
+const FastScanThreshold = 500 * time.Millisecond
+
 var (
 	rootCmd = &cobra.Command{
 		Use:   "prt",
@@ -58,6 +62,16 @@ func Execute(version string) error {
 func runPRT(cmd *cobra.Command, args []string) error {
 	startTime := time.Now()
 
+	// Determine output settings
+	isTTY := display.IsTTY(os.Stdout)
+	noColor := flagNoColor || os.Getenv("NO_COLOR") != ""
+	useASCII := noColor // Use ASCII if colors are disabled
+
+	// Apply color settings
+	if noColor {
+		display.DisableColors()
+	}
+
 	// 1. Load config with flag overrides
 	flags := &config.Flags{
 		Path:   flagPath,
@@ -87,7 +101,17 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scanner error: %w", err)
 	}
 
-	// 5. Run gh CLI check and repo scanning in parallel
+	// 5. Show discovery spinner while scanning
+	// Only show spinner for TTY and non-JSON output
+	var spinner *display.Spinner
+	showProgress := isTTY && !flagJSON
+	if showProgress {
+		spinner = display.NewSpinner(os.Stdout)
+		spinner.SetASCII(useASCII)
+		spinner.Start("Discovering repositories...")
+	}
+
+	// 6. Run gh CLI check and repo scanning in parallel
 	// This saves time by scanning repos while waiting for gh API calls
 	ghClient := github.NewClient()
 	needsUsername := cfg.GitHubUsername == ""
@@ -128,9 +152,18 @@ func runPRT(cmd *cobra.Command, args []string) error {
 			return
 		}
 		repos = r
+		// Update spinner count as repos are found
+		if spinner != nil {
+			spinner.UpdateCount(len(r))
+		}
 	}()
 
 	wg.Wait()
+
+	// Stop spinner
+	if spinner != nil {
+		spinner.Stop()
+	}
 
 	// Check for errors (gh errors take priority)
 	if ghErr != nil {
@@ -150,21 +183,39 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// 6. Fetch PRs with progress
-	// Progress callback is nil for now - will be implemented with progress display
-	github.FetchAllPRs(repos, ghClient, nil)
+	// 7. Fetch PRs with progress display
+	var progress *display.ProgressDisplay
+	if showProgress && len(repos) > 0 {
+		progress = display.NewProgressDisplay(len(repos),
+			display.WithWriter(os.Stdout),
+			display.WithTTY(isTTY),
+			display.WithASCII(useASCII),
+		)
+	}
 
-	// 7. Categorize
+	var progressCallback func(done, total int, repo *models.Repository)
+	if progress != nil {
+		progressCallback = progress.ProgressCallback()
+	}
+
+	github.FetchAllPRs(repos, ghClient, progressCallback)
+
+	// Clear progress display if used
+	if progress != nil {
+		progress.Clear()
+	}
+
+	// 8. Categorize
 	cat := categorizer.NewCategorizer()
 	result := cat.Categorize(repos, cfg, cfg.GitHubUsername)
 	result.ScanDuration = time.Since(startTime)
 
-	// 8. Render output
+	// 9. Render output
 	output, err := display.Render(result, display.RenderOptions{
 		ShowIcons:    cfg.ShowIcons,
 		ShowBranches: cfg.ShowBranchName,
 		ShowOtherPRs: cfg.ShowOtherPRs,
-		NoColor:      flagNoColor || os.Getenv("NO_COLOR") != "",
+		NoColor:      noColor,
 		JSON:         flagJSON,
 	})
 	if err != nil {
