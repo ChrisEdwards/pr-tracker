@@ -188,3 +188,111 @@ func pluralize(count int) string {
 func RenderPRSimple(pr *models.PR, showIcons bool, showBranches bool) string {
 	return RenderPR(pr, "  ", showIcons, showBranches, false)
 }
+
+// RenderOptions configures the output rendering behavior.
+type RenderOptions struct {
+	ShowIcons    bool // Show emoji icons for sections and status
+	ShowBranches bool // Show branch names (head → base)
+	NoColor      bool // Disable all color output
+	JSON         bool // Output as JSON instead of styled text
+}
+
+// Render orchestrates the complete terminal output from a ScanResult.
+// This is the main entry point for rendering PRT output.
+func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
+	if result == nil {
+		return "", fmt.Errorf("cannot render nil result")
+	}
+
+	// Handle JSON mode
+	if opts.JSON {
+		return RenderJSON(result)
+	}
+
+	// Handle no-color mode
+	if opts.NoColor {
+		DisableColors()
+	}
+
+	var b strings.Builder
+
+	// Header
+	b.WriteString(renderHeader())
+	b.WriteString("\n\n")
+
+	// My PRs section
+	b.WriteString(RenderSection(
+		"MY PRS",
+		IconMyPRs,
+		result.MyPRs,
+		result.Stacks,
+		opts.ShowIcons,
+		opts.ShowBranches,
+	))
+	b.WriteString("\n")
+
+	// Needs My Attention section
+	b.WriteString(RenderSection(
+		"NEEDS MY ATTENTION",
+		IconNeedsAttention,
+		result.NeedsMyAttention,
+		result.Stacks,
+		opts.ShowIcons,
+		opts.ShowBranches,
+	))
+	b.WriteString("\n")
+
+	// Team PRs section
+	b.WriteString(RenderSection(
+		"TEAM PRS",
+		IconTeam,
+		result.TeamPRs,
+		result.Stacks,
+		opts.ShowIcons,
+		opts.ShowBranches,
+	))
+	b.WriteString("\n")
+
+	// Other PRs section
+	b.WriteString(RenderSection(
+		"OTHER PRS",
+		IconOther,
+		result.OtherPRs,
+		result.Stacks,
+		opts.ShowIcons,
+		opts.ShowBranches,
+	))
+	b.WriteString("\n")
+
+	// Repos with no open PRs (only if there are any)
+	if len(result.ReposWithoutPRs) > 0 {
+		b.WriteString(RenderNoOpenPRsSection(result.ReposWithoutPRs, opts.ShowIcons))
+		b.WriteString("\n")
+	}
+
+	// Footer with summary
+	b.WriteString(renderFooter(result))
+
+	return b.String(), nil
+}
+
+// renderHeader renders the PRT header with decorative line.
+func renderHeader() string {
+	title := TitleStyle.Render("PRT")
+	separator := strings.Repeat("═", 60)
+	return title + " " + separator
+}
+
+// renderFooter renders the scan summary footer.
+func renderFooter(result *models.ScanResult) string {
+	separator := strings.Repeat("═", 65)
+
+	summary := fmt.Sprintf(
+		"Scanned %d repos · Found %d PRs · %s",
+		result.TotalReposScanned,
+		result.TotalPRsFound,
+		result.ScanDurationString(),
+	)
+
+	return SummaryStyle.Render(separator+"\n"+summary) + "\n"
+}
