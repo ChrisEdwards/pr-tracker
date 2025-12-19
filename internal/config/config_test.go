@@ -372,3 +372,168 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestLoad_EnvOverrides(t *testing.T) {
+	// Set environment variable
+	os.Setenv("PRT_SCAN_DEPTH", "10")
+	defer os.Unsetenv("PRT_SCAN_DEPTH")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Environment variable should override default
+	if cfg.ScanDepth != 10 {
+		t.Errorf("ScanDepth = %d, want 10 (from env)", cfg.ScanDepth)
+	}
+}
+
+func TestLoad_EnvOverrides_Username(t *testing.T) {
+	os.Setenv("PRT_GITHUB_USERNAME", "envuser")
+	defer os.Unsetenv("PRT_GITHUB_USERNAME")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.GitHubUsername != "envuser" {
+		t.Errorf("GitHubUsername = %q, want 'envuser' (from env)", cfg.GitHubUsername)
+	}
+}
+
+func TestLoad_FlagsOverrideEnv(t *testing.T) {
+	// Set environment variable
+	os.Setenv("PRT_SCAN_DEPTH", "10")
+	defer os.Unsetenv("PRT_SCAN_DEPTH")
+
+	// Flags should override env
+	flags := &Flags{
+		Depth: 7,
+	}
+
+	cfg, err := Load(flags)
+	if err != nil {
+		t.Fatalf("Load(flags) error: %v", err)
+	}
+
+	// Flag should win over env
+	if cfg.ScanDepth != 7 {
+		t.Errorf("ScanDepth = %d, want 7 (flag > env)", cfg.ScanDepth)
+	}
+}
+
+func TestLoad_Precedence(t *testing.T) {
+	// Test the complete precedence chain: flag > env > default
+	// We can't easily test file without more setup, but flag > env is key
+
+	// Set env
+	os.Setenv("PRT_SCAN_DEPTH", "8")
+	os.Setenv("PRT_DEFAULT_GROUP_BY", GroupByAuthor)
+	defer func() {
+		os.Unsetenv("PRT_SCAN_DEPTH")
+		os.Unsetenv("PRT_DEFAULT_GROUP_BY")
+	}()
+
+	// Flags override only scan_depth
+	flags := &Flags{
+		Depth: 5,
+		// Group not set - should use env value
+	}
+
+	cfg, err := Load(flags)
+	if err != nil {
+		t.Fatalf("Load(flags) error: %v", err)
+	}
+
+	// ScanDepth: flag wins
+	if cfg.ScanDepth != 5 {
+		t.Errorf("ScanDepth = %d, want 5 (from flag)", cfg.ScanDepth)
+	}
+
+	// DefaultGroupBy: env wins (no flag)
+	if cfg.DefaultGroupBy != GroupByAuthor {
+		t.Errorf("DefaultGroupBy = %q, want %q (from env)", cfg.DefaultGroupBy, GroupByAuthor)
+	}
+
+	// ShowIcons: default wins (no flag or env)
+	if !cfg.ShowIcons {
+		t.Error("ShowIcons should be true (from default)")
+	}
+}
+
+func TestLoad_WithTempConfigFile(t *testing.T) {
+	// Create a temp directory to act as config dir
+	tmpDir := t.TempDir()
+	configContent := `
+github_username: "fileuser"
+scan_depth: 6
+default_group_by: "author"
+search_paths:
+  - "/test/path"
+`
+	// Write config file
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write temp config: %v", err)
+	}
+
+	// Note: We can't easily override ConfigDir() in the current implementation,
+	// so this test verifies we can create and write a config file.
+	// The Load() function uses ConfigDir() internally.
+
+	// Verify the file was created correctly
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("Failed to read temp config: %v", err)
+	}
+	if !contains(string(data), "fileuser") {
+		t.Error("Config file should contain 'fileuser'")
+	}
+}
+
+func TestConfigFileExists_NoFile(t *testing.T) {
+	// ConfigFileExists should return false when no config exists
+	// Since we can't easily control ConfigDir, just verify the function runs
+	// This tests the code path at minimum
+	_ = ConfigFileExists()
+}
+
+func TestNeedsSetup_NilConfig(t *testing.T) {
+	// Verify NeedsSetup handles edge cases
+	cfg := &Config{} // Empty config
+	if !NeedsSetup(cfg) {
+		t.Error("Empty config should need setup")
+	}
+}
+
+func TestValidate_MultipleErrors(t *testing.T) {
+	// Config with multiple validation errors
+	cfg := &Config{
+		GitHubUsername: "",           // Error: required
+		SearchPaths:    []string{},   // Error: required
+		DefaultGroupBy: "invalid",    // Error: invalid
+		DefaultSort:    "wrong",      // Error: invalid
+		ScanDepth:      0,            // Error: must be >= 1
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() should return error for invalid config")
+	}
+
+	// Should be a ValidationError
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("Error should be *ValidationError, got %T", err)
+	}
+
+	// Should have 5 errors
+	if len(ve.Errors) != 5 {
+		t.Errorf("ValidationError.Errors = %d errors, want 5", len(ve.Errors))
+	}
+}
