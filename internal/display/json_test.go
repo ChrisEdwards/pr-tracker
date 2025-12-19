@@ -56,17 +56,17 @@ func TestRenderJSON_WithPRs(t *testing.T) {
 	}
 
 	pr2 := &models.PR{
-		Number:           102,
-		Title:            "Review: Add tests",
-		URL:              "https://github.com/org/repo/pull/102",
-		Author:           "alice",
-		State:            models.PRStateOpen,
-		ReviewRequests:   []string{"jdoe"},
-		BaseBranch:       "main",
-		HeadBranch:       "add-tests",
-		CreatedAt:        time.Now().Add(-48 * time.Hour),
-		CIStatus:         models.CIStatusFailing,
-		MyReviewStatus:   models.ReviewStateNone,
+		Number:                  102,
+		Title:                   "Review: Add tests",
+		URL:                     "https://github.com/org/repo/pull/102",
+		Author:                  "alice",
+		State:                   models.PRStateOpen,
+		ReviewRequests:          []string{"jdoe"},
+		BaseBranch:              "main",
+		HeadBranch:              "add-tests",
+		CreatedAt:               time.Now().Add(-48 * time.Hour),
+		CIStatus:                models.CIStatusFailing,
+		MyReviewStatus:          models.ReviewStateNone,
 		IsReviewRequestedFromMe: true,
 	}
 

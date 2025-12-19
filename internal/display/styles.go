@@ -13,8 +13,8 @@ var (
 	// HeaderStyle renders section headers (MY PRS, NEEDS ATTENTION, etc.)
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("15")).  // White
-			Background(lipgloss.Color("57")).  // Purple
+			Foreground(lipgloss.Color("15")). // White
+			Background(lipgloss.Color("57")). // Purple
 			Padding(0, 1)
 
 	// SubheaderStyle renders repository names within sections
@@ -107,16 +107,16 @@ var (
 // These are only shown when show_icons is enabled in config.
 const (
 	// Section icons
-	IconMyPRs         = "\U0001F4CB" // Clipboard
+	IconMyPRs          = "\U0001F4CB" // Clipboard
 	IconNeedsAttention = "\U0001F440" // Eyes
-	IconTeam          = "\U0001F465" // Busts in silhouette
-	IconOther         = "\U0001F916" // Robot
-	IconNoOpenPRs     = "\U0001F4C2" // Open folder
+	IconTeam           = "\U0001F465" // Busts in silhouette
+	IconOther          = "\U0001F916" // Robot
+	IconNoOpenPRs      = "\U0001F4C2" // Open folder
 
 	// PR state icons
 	IconDraft    = "\U0001F4DD" // Memo
 	IconMerged   = "\U0001F7E3" // Purple circle
-	IconApproved = "\u2705"    // Check mark
+	IconApproved = "\u2705"     // Check mark
 	IconChanges  = "\U0001F504" // Arrows counterclockwise
 	IconReview   = "\U0001F440" // Eyes
 	IconBlocked  = "\U0001F512" // Lock
@@ -128,12 +128,12 @@ const (
 
 	// Other icons
 	IconRepo  = "\U0001F4E6" // Package
-	IconEmpty = "\u2205"    // Empty set
+	IconEmpty = "\u2205"     // Empty set
 )
 
 // Tree drawing characters for rendering stacked PR hierarchies.
 const (
-	TreeVertical   = "\u2502"       // │
+	TreeVertical   = "\u2502"             // │
 	TreeBranch     = "\u251C\u2500\u2500" // ├──
 	TreeLastBranch = "\u2514\u2500\u2500" // └──
 	TreeIndent     = "    "

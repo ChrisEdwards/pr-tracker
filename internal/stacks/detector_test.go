@@ -264,9 +264,9 @@ func TestDetectStacks_Ordering(t *testing.T) {
 
 func TestFindStackedPRs(t *testing.T) {
 	prs := []*models.PR{
-		testPR(1, "feature", "main"),      // Has child, so stacked
+		testPR(1, "feature", "main"),        // Has child, so stacked
 		testPR(2, "feature-ext", "feature"), // Has parent, so stacked
-		testPR(3, "standalone", "main"),   // No stack
+		testPR(3, "standalone", "main"),     // No stack
 	}
 
 	stack := DetectStacks(prs)

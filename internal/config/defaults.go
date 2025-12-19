@@ -29,16 +29,16 @@ var KnownBots = []string{
 // DefaultConfig returns sensible default configuration values.
 // Note: GitHubUsername and SearchPaths must be set by user or auto-detected.
 var DefaultConfig = Config{
-	GitHubUsername: "",            // Must be set or auto-detected
-	TeamMembers:    []string{},    // No team members by default
-	SearchPaths:    []string{},    // Must be set by user
-	IncludeRepos:   []string{},    // Empty = match all repos
-	ScanDepth:      3,             // Reasonable default depth
-	Bots:           KnownBots,     // Pre-populated bot list
-	DefaultGroupBy: GroupByProject,// Group by project by default
-	DefaultSort:    SortOldest,    // Show oldest PRs first (needs attention)
-	ShowBranchName: true,          // Show branch names
-	ShowIcons:      true,          // Show status icons
+	GitHubUsername: "",             // Must be set or auto-detected
+	TeamMembers:    []string{},     // No team members by default
+	SearchPaths:    []string{},     // Must be set by user
+	IncludeRepos:   []string{},     // Empty = match all repos
+	ScanDepth:      3,              // Reasonable default depth
+	Bots:           KnownBots,      // Pre-populated bot list
+	DefaultGroupBy: GroupByProject, // Group by project by default
+	DefaultSort:    SortOldest,     // Show oldest PRs first (needs attention)
+	ShowBranchName: true,           // Show branch names
+	ShowIcons:      true,           // Show status icons
 }
 
 // ConfigDir returns the path to the PRT configuration directory.

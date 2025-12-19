@@ -10,17 +10,17 @@ import (
 
 // ghPR represents the JSON structure returned by `gh pr list --json ...`
 type ghPR struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	Author      struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Author struct {
 		Login string `json:"login"`
 	} `json:"author"`
-	State       string `json:"state"`
-	IsDraft     bool   `json:"isDraft"`
-	CreatedAt   string `json:"createdAt"`
-	BaseRefName string `json:"baseRefName"`
-	HeadRefName string `json:"headRefName"`
+	State             string          `json:"state"`
+	IsDraft           bool            `json:"isDraft"`
+	CreatedAt         string          `json:"createdAt"`
+	BaseRefName       string          `json:"baseRefName"`
+	HeadRefName       string          `json:"headRefName"`
 	StatusCheckRollup []ghStatusCheck `json:"statusCheckRollup"`
 	ReviewRequests    []ghUser        `json:"reviewRequests"`
 	Assignees         []ghUser        `json:"assignees"`
@@ -132,7 +132,7 @@ func computeCIStatus(checks []ghStatusCheck) models.CIStatus {
 			hasFailing = true
 		case "PENDING", "EXPECTED", "QUEUED", "IN_PROGRESS", "WAITING":
 			hasPending = true
-		// SUCCESS, SKIPPED, NEUTRAL are considered passing
+			// SUCCESS, SKIPPED, NEUTRAL are considered passing
 		}
 	}
 

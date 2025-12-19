@@ -84,7 +84,6 @@ func (r *Retryer) Do(fn func() error) error {
 // Similar to Do but for functions that return a result.
 func (r *Retryer) DoWithResult(fn func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	var result interface{}
 
 	for attempt := 1; attempt <= r.config.MaxAttempts; attempt++ {
 		res, err := fn()
@@ -98,7 +97,6 @@ func (r *Retryer) DoWithResult(fn func() (interface{}, error)) (interface{}, err
 		}
 
 		lastErr = err
-		result = res
 
 		// Sleep before next attempt (except on last attempt)
 		if attempt < r.config.MaxAttempts {
@@ -107,7 +105,6 @@ func (r *Retryer) DoWithResult(fn func() (interface{}, error)) (interface{}, err
 		}
 	}
 
-	_ = result // result from failed attempts is discarded
 	return nil, &NetworkError{
 		Cause:   lastErr,
 		Retries: r.config.MaxAttempts,

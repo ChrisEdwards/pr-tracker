@@ -40,10 +40,10 @@ func TestNewScanner(t *testing.T) {
 
 func TestCountDepth(t *testing.T) {
 	tests := []struct {
-		name  string
-		base  string
-		path  string
-		want  int
+		name string
+		base string
+		path string
+		want int
 	}{
 		{
 			name: "same directory",

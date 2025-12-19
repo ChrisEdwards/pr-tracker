@@ -514,11 +514,11 @@ func TestNeedsSetup_NilConfig(t *testing.T) {
 func TestValidate_MultipleErrors(t *testing.T) {
 	// Config with multiple validation errors
 	cfg := &Config{
-		GitHubUsername: "",           // Error: required
-		SearchPaths:    []string{},   // Error: required
-		DefaultGroupBy: "invalid",    // Error: invalid
-		DefaultSort:    "wrong",      // Error: invalid
-		ScanDepth:      0,            // Error: must be >= 1
+		GitHubUsername: "",         // Error: required
+		SearchPaths:    []string{}, // Error: required
+		DefaultGroupBy: "invalid",  // Error: invalid
+		DefaultSort:    "wrong",    // Error: invalid
+		ScanDepth:      0,          // Error: must be >= 1
 	}
 
 	err := cfg.Validate()

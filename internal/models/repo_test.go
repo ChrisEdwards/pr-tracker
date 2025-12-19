@@ -8,24 +8,24 @@ import (
 
 func TestRepository_FullName(t *testing.T) {
 	tests := []struct {
-		name  string
-		repo  Repository
-		want  string
+		name string
+		repo Repository
+		want string
 	}{
 		{
-			name:  "with owner",
-			repo:  Repository{Owner: "myorg", Name: "myrepo"},
-			want:  "myorg/myrepo",
+			name: "with owner",
+			repo: Repository{Owner: "myorg", Name: "myrepo"},
+			want: "myorg/myrepo",
 		},
 		{
-			name:  "without owner",
-			repo:  Repository{Name: "myrepo"},
-			want:  "myrepo",
+			name: "without owner",
+			repo: Repository{Name: "myrepo"},
+			want: "myrepo",
 		},
 		{
-			name:  "empty owner",
-			repo:  Repository{Owner: "", Name: "myrepo"},
-			want:  "myrepo",
+			name: "empty owner",
+			repo: Repository{Owner: "", Name: "myrepo"},
+			want: "myrepo",
 		},
 	}
 
