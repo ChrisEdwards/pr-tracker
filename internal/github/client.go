@@ -1,14 +1,18 @@
 package github
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 )
 
 // Client provides methods for interacting with GitHub via the gh CLI.
 type Client interface {
 	// Check verifies gh CLI is installed and authenticated.
 	Check() error
+	// GetCurrentUser returns the authenticated GitHub username.
+	GetCurrentUser() (string, error)
 }
 
 // client is the default implementation of Client.
@@ -62,4 +66,25 @@ Please run:
 	}
 
 	return nil
+}
+
+// GetCurrentUser returns the authenticated GitHub username by querying the API.
+func (c *client) GetCurrentUser() (string, error) {
+	cmd := c.execCommand("gh", "api", "user", "--jq", ".login")
+
+	out, err := cmd.Output()
+	if err != nil {
+		// Try to get more info from stderr
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("failed to get current user: %s", strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return "", fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	username := strings.TrimSpace(string(out))
+	if username == "" {
+		return "", fmt.Errorf("empty username returned from GitHub API")
+	}
+
+	return username, nil
 }

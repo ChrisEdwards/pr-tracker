@@ -133,3 +133,106 @@ func TestCheck_AuthCommandArgs(t *testing.T) {
 		t.Errorf("expected args [auth status], got %v", capturedArgs)
 	}
 }
+
+func TestGetCurrentUser_Success(t *testing.T) {
+	c := &client{
+		execLookPath: exec.LookPath,
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Return a command that echoes the username
+			return exec.Command("echo", "testuser")
+		},
+	}
+
+	user, err := c.GetCurrentUser()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if user != "testuser" {
+		t.Errorf("expected 'testuser', got %q", user)
+	}
+}
+
+func TestGetCurrentUser_TrimsWhitespace(t *testing.T) {
+	c := &client{
+		execLookPath: exec.LookPath,
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Return a command that echoes with extra whitespace
+			return exec.Command("echo", "  testuser  ")
+		},
+	}
+
+	user, err := c.GetCurrentUser()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if user != "testuser" {
+		t.Errorf("expected 'testuser', got %q", user)
+	}
+}
+
+func TestGetCurrentUser_EmptyResponse(t *testing.T) {
+	c := &client{
+		execLookPath: exec.LookPath,
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Return a command that echoes empty string
+			return exec.Command("echo", "")
+		},
+	}
+
+	_, err := c.GetCurrentUser()
+	if err == nil {
+		t.Fatal("expected error for empty response")
+	}
+
+	if err.Error() != "empty username returned from GitHub API" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestGetCurrentUser_CommandFails(t *testing.T) {
+	c := &client{
+		execLookPath: exec.LookPath,
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			// Return a command that fails
+			return exec.Command("false")
+		},
+	}
+
+	_, err := c.GetCurrentUser()
+	if err == nil {
+		t.Fatal("expected error when command fails")
+	}
+}
+
+func TestGetCurrentUser_CommandArgs(t *testing.T) {
+	var capturedName string
+	var capturedArgs []string
+
+	c := &client{
+		execLookPath: exec.LookPath,
+		execCommand: func(name string, arg ...string) *exec.Cmd {
+			capturedName = name
+			capturedArgs = arg
+			return exec.Command("echo", "testuser")
+		},
+	}
+
+	c.GetCurrentUser()
+
+	if capturedName != "gh" {
+		t.Errorf("expected command 'gh', got %q", capturedName)
+	}
+
+	expectedArgs := []string{"api", "user", "--jq", ".login"}
+	if len(capturedArgs) != len(expectedArgs) {
+		t.Fatalf("expected %d args, got %d", len(expectedArgs), len(capturedArgs))
+	}
+
+	for i, expected := range expectedArgs {
+		if capturedArgs[i] != expected {
+			t.Errorf("arg[%d]: expected %q, got %q", i, expected, capturedArgs[i])
+		}
+	}
+}
