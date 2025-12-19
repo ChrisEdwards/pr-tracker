@@ -369,7 +369,7 @@ func TestRender_EmptyResult(t *testing.T) {
 		t.Error("Output should contain PRT header")
 	}
 
-	// Should have all sections
+	// Should have core sections
 	if !strings.Contains(output, "MY PRS") {
 		t.Error("Output should contain MY PRS section")
 	}
@@ -379,8 +379,9 @@ func TestRender_EmptyResult(t *testing.T) {
 	if !strings.Contains(output, "TEAM PRS") {
 		t.Error("Output should contain TEAM PRS section")
 	}
-	if !strings.Contains(output, "OTHER PRS") {
-		t.Error("Output should contain OTHER PRS section")
+	// OTHER PRS should NOT be shown by default
+	if strings.Contains(output, "OTHER PRS") {
+		t.Error("Output should NOT contain OTHER PRS section by default")
 	}
 
 	// Should have footer with stats
@@ -480,6 +481,44 @@ func TestRender_WithIcons(t *testing.T) {
 	// Check for section icons
 	if !strings.Contains(output, IconMyPRs) {
 		t.Error("Output should contain My PRs icon when ShowIcons is true")
+	}
+}
+
+func TestRender_WithOtherPRs(t *testing.T) {
+	result := models.NewScanResult()
+	result.OtherPRs = []*models.PR{
+		{
+			Number:    99,
+			Title:     "External PR",
+			URL:       "https://github.com/org/repo/pull/99",
+			RepoName:  "repo",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	// Without ShowOtherPRs, section should be hidden
+	output, err := Render(result, RenderOptions{ShowOtherPRs: false})
+	if err != nil {
+		t.Fatalf("Render should not error: %v", err)
+	}
+	if strings.Contains(output, "OTHER PRS") {
+		t.Error("Output should NOT contain OTHER PRS section when ShowOtherPRs is false")
+	}
+	if strings.Contains(output, "#99") {
+		t.Error("Output should NOT contain PR #99 when ShowOtherPRs is false")
+	}
+
+	// With ShowOtherPRs, section should be visible
+	output, err = Render(result, RenderOptions{ShowOtherPRs: true})
+	if err != nil {
+		t.Fatalf("Render should not error: %v", err)
+	}
+	if !strings.Contains(output, "OTHER PRS") {
+		t.Error("Output should contain OTHER PRS section when ShowOtherPRs is true")
+	}
+	if !strings.Contains(output, "#99") {
+		t.Error("Output should contain PR #99 when ShowOtherPRs is true")
 	}
 }
 

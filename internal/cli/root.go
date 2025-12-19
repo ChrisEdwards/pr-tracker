@@ -123,6 +123,7 @@ func runPRT(cmd *cobra.Command, args []string) error {
 	output, err := display.Render(result, display.RenderOptions{
 		ShowIcons:    cfg.ShowIcons,
 		ShowBranches: cfg.ShowBranchName,
+		ShowOtherPRs: cfg.ShowOtherPRs,
 		NoColor:      flagNoColor || os.Getenv("NO_COLOR") != "",
 		JSON:         flagJSON,
 	})

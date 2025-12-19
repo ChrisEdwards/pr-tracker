@@ -90,6 +90,7 @@ func Load(flags *Flags) (*Config, error) {
 	v.SetDefault("default_sort", DefaultConfig.DefaultSort)
 	v.SetDefault("show_branch_name", DefaultConfig.ShowBranchName)
 	v.SetDefault("show_icons", DefaultConfig.ShowIcons)
+	v.SetDefault("show_other_prs", DefaultConfig.ShowOtherPRs)
 
 	// 2. Load config file
 	v.SetConfigName("config")

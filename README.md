@@ -142,6 +142,7 @@ default_group_by: "project"  # project | author
 default_sort: "oldest"       # oldest | newest
 show_branch_name: true
 show_icons: true
+show_other_prs: false        # Show "Other PRs" section
 ```
 
 ### Configuration Options
@@ -158,6 +159,7 @@ show_icons: true
 | `default_sort` | `oldest` | Sort by oldest or newest first |
 | `show_branch_name` | `true` | Show branch names |
 | `show_icons` | `true` | Show emoji icons |
+| `show_other_prs` | `false` | Show "Other PRs" section |
 
 ## Output Categories
 

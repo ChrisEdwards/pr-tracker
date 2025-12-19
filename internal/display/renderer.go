@@ -193,6 +193,7 @@ func RenderPRSimple(pr *models.PR, showIcons bool, showBranches bool) string {
 type RenderOptions struct {
 	ShowIcons    bool // Show emoji icons for sections and status
 	ShowBranches bool // Show branch names (head → base)
+	ShowOtherPRs bool // Show "Other PRs" section (external contributors, bots)
 	NoColor      bool // Disable all color output
 	JSON         bool // Output as JSON instead of styled text
 }
@@ -253,16 +254,18 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 	))
 	b.WriteString("\n")
 
-	// Other PRs section
-	b.WriteString(RenderSection(
-		"OTHER PRS",
-		IconOther,
-		result.OtherPRs,
-		result.Stacks,
-		opts.ShowIcons,
-		opts.ShowBranches,
-	))
-	b.WriteString("\n")
+	// Other PRs section (only if enabled)
+	if opts.ShowOtherPRs {
+		b.WriteString(RenderSection(
+			"OTHER PRS",
+			IconOther,
+			result.OtherPRs,
+			result.Stacks,
+			opts.ShowIcons,
+			opts.ShowBranches,
+		))
+		b.WriteString("\n")
+	}
 
 	// Repos with no open PRs (only if there are any)
 	if len(result.ReposWithoutPRs) > 0 {

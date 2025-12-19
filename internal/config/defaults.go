@@ -39,6 +39,7 @@ var DefaultConfig = Config{
 	DefaultSort:    SortOldest,     // Show oldest PRs first (needs attention)
 	ShowBranchName: true,           // Show branch names
 	ShowIcons:      true,           // Show status icons
+	ShowOtherPRs:   false,          // Hide "Other PRs" by default
 }
 
 // ConfigDir returns the path to the PRT configuration directory.

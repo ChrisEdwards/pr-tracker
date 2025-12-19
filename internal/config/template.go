@@ -68,6 +68,10 @@ show_branch_name: {{.ShowBranchName}}
 
 # Show icons (requires a Nerd Font or emoji support)
 show_icons: {{.ShowIcons}}
+
+# Show "Other PRs" section (external contributors, bots, etc.)
+# Default: false (hidden to reduce noise)
+show_other_prs: {{.ShowOtherPRs}}
 `
 
 // GenerateConfigFile generates a well-commented YAML config file from the given config.

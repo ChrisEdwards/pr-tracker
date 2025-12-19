@@ -34,6 +34,7 @@ type Config struct {
 	DefaultSort    string `yaml:"default_sort" mapstructure:"default_sort"`         // oldest | newest
 	ShowBranchName bool   `yaml:"show_branch_name" mapstructure:"show_branch_name"`
 	ShowIcons      bool   `yaml:"show_icons" mapstructure:"show_icons"`
+	ShowOtherPRs   bool   `yaml:"show_other_prs" mapstructure:"show_other_prs"` // Show "Other PRs" section
 }
 
 // IsValidGroupBy returns true if the given value is a valid GroupBy option.
