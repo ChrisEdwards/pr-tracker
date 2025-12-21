@@ -77,7 +77,7 @@ var (
 	// RepoStyle renders repository names
 	RepoStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("37")) // Teal
+			Foreground(lipgloss.Color("183")) // Light purple/lavender
 
 	// TitleStyle renders the main PRT header
 	TitleStyle = lipgloss.NewStyle().
