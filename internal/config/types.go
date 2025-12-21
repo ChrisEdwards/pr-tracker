@@ -35,6 +35,9 @@ type Config struct {
 	ShowBranchName bool   `yaml:"show_branch_name" mapstructure:"show_branch_name"`
 	ShowIcons      bool   `yaml:"show_icons" mapstructure:"show_icons"`
 	ShowOtherPRs   bool   `yaml:"show_other_prs" mapstructure:"show_other_prs"` // Show "Other PRs" section
+
+	// Filtering options
+	MaxPRAgeDays int `yaml:"max_pr_age_days" mapstructure:"max_pr_age_days"` // Hide PRs older than N days (0 = no limit)
 }
 
 // IsValidGroupBy returns true if the given value is a valid GroupBy option.

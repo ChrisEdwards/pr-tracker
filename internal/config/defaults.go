@@ -40,6 +40,7 @@ var DefaultConfig = Config{
 	ShowBranchName: true,           // Show branch names
 	ShowIcons:      true,           // Show status icons
 	ShowOtherPRs:   false,          // Hide "Other PRs" by default
+	MaxPRAgeDays:   0,              // No age limit by default (0 = show all)
 }
 
 // ConfigDir returns the path to the PRT configuration directory.

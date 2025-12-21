@@ -2,6 +2,8 @@
 package categorizer
 
 import (
+	"time"
+
 	"prt/internal/config"
 	"prt/internal/models"
 	"prt/internal/stacks"
@@ -56,6 +58,11 @@ func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config,
 
 		// Categorize each PR
 		for _, pr := range repo.PRs {
+			// Skip PRs older than max age (if configured)
+			if isTooOld(pr, cfg.MaxPRAgeDays) {
+				continue
+			}
+
 			pr.RepoName = repo.Name
 			pr.RepoOwner = repo.Owner
 			pr.RepoPath = repo.Path
@@ -144,4 +151,14 @@ func findMyReviewStatus(reviews []models.Review, username string) models.ReviewS
 		return models.ReviewStateNone
 	}
 	return latest.State
+}
+
+// isTooOld returns true if the PR is older than maxAgeDays.
+// Returns false if maxAgeDays is 0 (no limit) or negative.
+func isTooOld(pr *models.PR, maxAgeDays int) bool {
+	if maxAgeDays <= 0 {
+		return false
+	}
+	cutoff := time.Now().AddDate(0, 0, -maxAgeDays)
+	return pr.CreatedAt.Before(cutoff)
 }

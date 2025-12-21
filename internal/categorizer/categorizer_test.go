@@ -432,3 +432,127 @@ func TestCategorize_PriorityOrder(t *testing.T) {
 		t.Errorf("Expected 0 PRs in TeamPRs (my own PR shouldn't be counted as team), got %d", len(result.TeamPRs))
 	}
 }
+
+func TestIsTooOld(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name       string
+		createdAt  time.Time
+		maxAgeDays int
+		expected   bool
+	}{
+		{
+			name:       "no limit (0) - recent PR",
+			createdAt:  now.Add(-24 * time.Hour),
+			maxAgeDays: 0,
+			expected:   false,
+		},
+		{
+			name:       "no limit (0) - old PR",
+			createdAt:  now.AddDate(0, 0, -100),
+			maxAgeDays: 0,
+			expected:   false,
+		},
+		{
+			name:       "negative limit - should not filter",
+			createdAt:  now.AddDate(0, 0, -100),
+			maxAgeDays: -1,
+			expected:   false,
+		},
+		{
+			name:       "30 day limit - PR is 10 days old",
+			createdAt:  now.AddDate(0, 0, -10),
+			maxAgeDays: 30,
+			expected:   false,
+		},
+		{
+			name:       "30 day limit - PR is 29 days old",
+			createdAt:  now.AddDate(0, 0, -29),
+			maxAgeDays: 30,
+			expected:   false, // within limit
+		},
+		{
+			name:       "30 day limit - PR is 31 days old",
+			createdAt:  now.AddDate(0, 0, -31),
+			maxAgeDays: 30,
+			expected:   true,
+		},
+		{
+			name:       "90 day limit - PR is 100 days old",
+			createdAt:  now.AddDate(0, 0, -100),
+			maxAgeDays: 90,
+			expected:   true,
+		},
+		{
+			name:       "1 day limit - PR is brand new",
+			createdAt:  now,
+			maxAgeDays: 1,
+			expected:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := &models.PR{CreatedAt: tt.createdAt}
+			got := isTooOld(pr, tt.maxAgeDays)
+			if got != tt.expected {
+				t.Errorf("isTooOld() = %v, want %v (createdAt: %v, maxAgeDays: %d)",
+					got, tt.expected, tt.createdAt, tt.maxAgeDays)
+			}
+		})
+	}
+}
+
+func TestCategorize_MaxPRAgeDays(t *testing.T) {
+	c := NewCategorizer()
+	now := time.Now()
+
+	repos := []*models.Repository{
+		{
+			Name: "test-repo",
+			PRs: []*models.PR{
+				{Number: 1, Title: "Recent PR", Author: "testuser", CreatedAt: now.AddDate(0, 0, -5)},
+				{Number: 2, Title: "Old PR", Author: "testuser", CreatedAt: now.AddDate(0, 0, -100)},
+				{Number: 3, Title: "Very old PR", Author: "alice", CreatedAt: now.AddDate(0, 0, -200)},
+			},
+		},
+	}
+
+	// Test with 30-day limit - should filter old PRs
+	cfg := &config.Config{MaxPRAgeDays: 30}
+	result := c.Categorize(repos, cfg, "testuser")
+
+	if len(result.MyPRs) != 1 {
+		t.Errorf("Expected 1 PR in MyPRs (only recent one), got %d", len(result.MyPRs))
+	}
+	if len(result.MyPRs) > 0 && result.MyPRs[0].Number != 1 {
+		t.Errorf("Expected PR #1 (recent) in MyPRs, got #%d", result.MyPRs[0].Number)
+	}
+	if len(result.OtherPRs) != 0 {
+		t.Errorf("Expected 0 PRs in OtherPRs (old ones filtered), got %d", len(result.OtherPRs))
+	}
+}
+
+func TestCategorize_MaxPRAgeDays_NoLimit(t *testing.T) {
+	c := NewCategorizer()
+	now := time.Now()
+
+	repos := []*models.Repository{
+		{
+			Name: "test-repo",
+			PRs: []*models.PR{
+				{Number: 1, Title: "Recent PR", Author: "testuser", CreatedAt: now.AddDate(0, 0, -5)},
+				{Number: 2, Title: "Old PR", Author: "testuser", CreatedAt: now.AddDate(0, 0, -100)},
+			},
+		},
+	}
+
+	// Test with no limit (0) - should include all PRs
+	cfg := &config.Config{MaxPRAgeDays: 0}
+	result := c.Categorize(repos, cfg, "testuser")
+
+	if len(result.MyPRs) != 2 {
+		t.Errorf("Expected 2 PRs in MyPRs (no age limit), got %d", len(result.MyPRs))
+	}
+}
