@@ -23,12 +23,12 @@ func RenderPRWithContinuation(pr *models.PR, prefix string, continuationPrefix s
 
 	// Line 1: Number and title
 	// Note: prefix contains tree characters (│, └──, etc.) already styled with TreeStyle
-	// We must NOT wrap prefix in NumberStyle or it will override the tree styling
+	// We must NOT wrap prefix in any style or it will override the tree styling
+	b.WriteString(prefix)
 	if isBlocked {
-		titleLine := fmt.Sprintf("%s #%d %s", prefix, pr.Number, pr.Title)
-		b.WriteString(BlockedStyle.Render(titleLine))
+		// Blocked PRs: dim the number and title, but preserve tree char styling
+		b.WriteString(BlockedStyle.Render(fmt.Sprintf("#%d %s", pr.Number, pr.Title)))
 	} else {
-		b.WriteString(prefix)
 		b.WriteString(NumberStyle.Render(fmt.Sprintf("#%d", pr.Number)))
 		b.WriteString(" ")
 		b.WriteString(pr.Title)
