@@ -44,8 +44,7 @@ func RenderSection(title string, icon string, prs []*models.PR, stacks map[strin
 	for _, repoName := range repoNames {
 		repoPRs := byRepo[repoName]
 
-		// Repo header
-		b.WriteString("  ")
+		// Repo header (no indent - tree lines start directly below)
 		b.WriteString(RepoStyle.Render(fmt.Sprintf("[%s]", repoName)))
 		b.WriteString("\n")
 
