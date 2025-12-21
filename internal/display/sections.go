@@ -110,9 +110,9 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 	// Render non-stacked PRs
 	for _, pr := range nonStackedPRs {
 		isLast := itemIdx == totalItems-1
-		prefix := TreeBranch
+		prefix := TreeStyle.Render(TreeBranch)
 		if isLast {
-			prefix = TreeLastBranch
+			prefix = TreeStyle.Render(TreeLastBranch)
 		}
 		b.WriteString(RenderPR(pr, prefix, showIcons, showBranches, false))
 		itemIdx++
@@ -126,22 +126,26 @@ func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix
 		return
 	}
 
-	// Determine branch character for title line
-	branch := TreeBranch
+	// Style the branch character consistently
+	branch := TreeStyle.Render(TreeBranch)
 	if isLast {
-		branch = TreeLastBranch
+		branch = TreeStyle.Render(TreeLastBranch)
 	}
 
 	// Determine if this PR is blocked (has unmerged parent)
 	isBlocked := node.IsBlocked()
 
 	// Calculate continuation prefix for detail lines (status, branches, URL)
-	// This shows the vertical tree line if there are more siblings at this level
+	// Show vertical line if there are more siblings OR if this node has children
+	// This creates the visual connection between parent and children
 	var continuationPrefix string
-	if isLast {
-		continuationPrefix = prefix + TreeIndent // spaces, no more siblings
+	hasMoreSiblings := !isLast
+	hasChildren := len(node.Children) > 0
+
+	if hasMoreSiblings || hasChildren {
+		continuationPrefix = prefix + TreeStyle.Render(TreeVertical) + "   "
 	} else {
-		continuationPrefix = prefix + TreeStyle.Render(TreeVertical) + "   " // vertical line continues
+		continuationPrefix = prefix + TreeIndent
 	}
 
 	// Render the PR with tree prefix and continuation for detail lines
@@ -149,6 +153,7 @@ func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix
 	b.WriteString(prOutput)
 
 	// Calculate prefix for children (used in their title lines)
+	// Children get the parent's continuation (vertical if not last) plus their own branch
 	childPrefix := prefix
 	if isLast {
 		childPrefix += TreeIndent
