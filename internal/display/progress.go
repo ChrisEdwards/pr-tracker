@@ -254,9 +254,9 @@ func (p *ProgressDisplay) renderTTY() {
 		ProgressTextStyle.Render(fmt.Sprintf("%d%%", int(pct*100))),
 		DimStyle.Render(elapsedStr))
 
-	// Results
-	for _, r := range p.results {
-		fmt.Fprintf(p.writer, "  %s\n", r)
+	// Show only the current (most recent) repo status - single line that updates in place
+	if len(p.results) > 0 {
+		fmt.Fprintf(p.writer, "  %s\n", p.results[len(p.results)-1])
 	}
 }
 
