@@ -219,27 +219,3 @@ func RenderEmptySection(title string, icon string, showIcons bool) string {
 	return b.String()
 }
 
-// RenderNoOpenPRsSection renders a special section for repos with no open PRs.
-func RenderNoOpenPRsSection(repos []*models.Repository, showIcons bool) string {
-	if len(repos) == 0 {
-		return ""
-	}
-
-	var b strings.Builder
-
-	// Header
-	icon := ""
-	if showIcons {
-		icon = IconNoOpenPRs
-	}
-	b.WriteString(RenderSectionHeader(icon, "REPOS WITH NO OPEN PRS", showIcons))
-	b.WriteString("\n\n")
-
-	// List repos
-	for _, repo := range repos {
-		b.WriteString(MetaStyle.Render(fmt.Sprintf("  • %s (%s)", repo.Name, repo.Path)))
-		b.WriteString("\n")
-	}
-
-	return b.String()
-}

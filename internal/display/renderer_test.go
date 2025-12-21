@@ -584,47 +584,6 @@ func TestRender_JSONMode(t *testing.T) {
 	}
 }
 
-func TestRender_WithReposWithoutPRs(t *testing.T) {
-	result := models.NewScanResult()
-	result.TotalReposScanned = 3
-	result.ReposWithoutPRs = []*models.Repository{
-		{Name: "empty-repo-1", Path: "/path/to/empty-repo-1"},
-		{Name: "empty-repo-2", Path: "/path/to/empty-repo-2"},
-	}
-
-	output, err := Render(result, RenderOptions{})
-	if err != nil {
-		t.Fatalf("Render should not error: %v", err)
-	}
-
-	// Should have repos without PRs section
-	if !strings.Contains(output, "REPOS WITH NO OPEN PRS") {
-		t.Error("Output should contain REPOS WITH NO OPEN PRS section")
-	}
-	if !strings.Contains(output, "empty-repo-1") {
-		t.Error("Output should list empty-repo-1")
-	}
-	if !strings.Contains(output, "empty-repo-2") {
-		t.Error("Output should list empty-repo-2")
-	}
-}
-
-func TestRender_NoReposWithoutPRsSection(t *testing.T) {
-	result := models.NewScanResult()
-	result.TotalReposScanned = 1
-	// No repos without PRs - section should be omitted
-
-	output, err := Render(result, RenderOptions{})
-	if err != nil {
-		t.Fatalf("Render should not error: %v", err)
-	}
-
-	// Should NOT have repos without PRs section when empty
-	if strings.Contains(output, "REPOS WITH NO OPEN PRS") {
-		t.Error("Output should not contain REPOS WITH NO OPEN PRS section when there are none")
-	}
-}
-
 func TestRenderHeader(t *testing.T) {
 	header := renderHeader()
 

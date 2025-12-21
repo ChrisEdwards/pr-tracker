@@ -55,7 +55,6 @@ func TestIconConstantsAreDefined(t *testing.T) {
 		{"IconNeedsAttention", IconNeedsAttention},
 		{"IconTeam", IconTeam},
 		{"IconOther", IconOther},
-		{"IconNoOpenPRs", IconNoOpenPRs},
 		{"IconDraft", IconDraft},
 		{"IconMerged", IconMerged},
 		{"IconApproved", IconApproved},

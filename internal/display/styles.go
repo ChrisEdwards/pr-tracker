@@ -111,7 +111,6 @@ const (
 	IconNeedsAttention = "\U0001F440" // Eyes
 	IconTeam           = "\U0001F465" // Busts in silhouette
 	IconOther          = "\U0001F916" // Robot
-	IconNoOpenPRs      = "\U0001F4C2" // Open folder
 
 	// PR state icons
 	IconDraft    = "\U0001F4DD" // Memo

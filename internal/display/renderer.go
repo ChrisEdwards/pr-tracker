@@ -284,12 +284,6 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 		b.WriteString("\n")
 	}
 
-	// Repos with no open PRs (only if there are any)
-	if len(result.ReposWithoutPRs) > 0 {
-		b.WriteString(RenderNoOpenPRsSection(result.ReposWithoutPRs, opts.ShowIcons))
-		b.WriteString("\n")
-	}
-
 	// Footer with summary
 	b.WriteString(renderFooter(result))
 

@@ -142,44 +142,6 @@ func TestRenderEmptySection(t *testing.T) {
 	}
 }
 
-func TestRenderNoOpenPRsSection_Empty(t *testing.T) {
-	result := RenderNoOpenPRsSection(nil, false)
-	if result != "" {
-		t.Error("Empty repos should return empty string")
-	}
-}
-
-func TestRenderNoOpenPRsSection_WithRepos(t *testing.T) {
-	repos := []*models.Repository{
-		{Name: "repo-a", Path: "/path/to/repo-a"},
-		{Name: "repo-b", Path: "/path/to/repo-b"},
-	}
-
-	result := RenderNoOpenPRsSection(repos, false)
-
-	if !strings.Contains(result, "REPOS WITH NO OPEN PRS") {
-		t.Error("Should contain section title")
-	}
-	if !strings.Contains(result, "repo-a") {
-		t.Error("Should contain repo-a name")
-	}
-	if !strings.Contains(result, "/path/to/repo-a") {
-		t.Error("Should contain repo-a path")
-	}
-}
-
-func TestRenderNoOpenPRsSection_WithIcons(t *testing.T) {
-	repos := []*models.Repository{
-		{Name: "test", Path: "/test"},
-	}
-
-	result := RenderNoOpenPRsSection(repos, true)
-
-	if !strings.Contains(result, IconNoOpenPRs) {
-		t.Error("Should contain icon when showIcons is true")
-	}
-}
-
 func TestIsPRBlocked_NoStack(t *testing.T) {
 	pr := &models.PR{Number: 42}
 	if isPRBlocked(pr, nil) {
