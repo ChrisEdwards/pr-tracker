@@ -136,16 +136,23 @@ func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix
 	isBlocked := node.IsBlocked()
 
 	// Calculate continuation prefix for detail lines (status, branches, URL)
-	// Show vertical line if there are more siblings OR if this node has children
-	// This creates the visual connection between parent and children
+	// This needs TWO components at DIFFERENT indentation levels:
+	// 1. Vertical at THIS level if there are more siblings below (connects to next sibling)
+	// 2. Vertical at CHILD level if this node has children (connects to first child)
 	var continuationPrefix string
-	hasMoreSiblings := !isLast
-	hasChildren := len(node.Children) > 0
 
-	if hasMoreSiblings || hasChildren {
+	// Part 1: Base continuation for this level (sibling connection)
+	if !isLast {
+		// More siblings below - show vertical bar at this level
 		continuationPrefix = prefix + TreeStyle.Render(TreeVertical) + "   "
 	} else {
+		// Last sibling - just spaces at this level
 		continuationPrefix = prefix + TreeIndent
+	}
+
+	// Part 2: Child connection (adds vertical at the NEXT indentation level)
+	if len(node.Children) > 0 {
+		continuationPrefix += TreeStyle.Render(TreeVertical) + "   "
 	}
 
 	// Render the PR with tree prefix and continuation for detail lines
