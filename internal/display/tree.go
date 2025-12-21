@@ -53,11 +53,20 @@ func renderNode(b *strings.Builder, node *models.StackNode, prefix string, isLas
 	// Determine if this PR is blocked (has unmerged parent)
 	isBlocked := node.IsBlocked()
 
-	// Render the PR with tree prefix
-	prOutput := RenderPR(node.PR, prefix+styledBranch+" ", showIcons, showBranches, isBlocked)
+	// Calculate continuation prefix for detail lines (status, branches, URL)
+	// This shows the vertical tree line if there are more siblings at this level
+	var continuationPrefix string
+	if isLast {
+		continuationPrefix = prefix + TreeIndent // spaces, no more siblings
+	} else {
+		continuationPrefix = prefix + TreeStyle.Render(TreeVertical) + "   " // vertical line continues
+	}
+
+	// Render the PR with tree prefix and continuation for detail lines
+	prOutput := RenderPRWithContinuation(node.PR, prefix+styledBranch+" ", continuationPrefix, showIcons, showBranches, isBlocked)
 	b.WriteString(prOutput)
 
-	// Calculate prefix for children
+	// Calculate prefix for children (used in their title lines)
 	childPrefix := prefix
 	if isLast {
 		childPrefix += TreeIndent

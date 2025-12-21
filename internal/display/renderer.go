@@ -12,6 +12,13 @@ import (
 // The prefix should be a tree character like TreeBranch or TreeLastBranch.
 // If isBlocked is true, the entire PR is rendered with dimmed styling.
 func RenderPR(pr *models.PR, prefix string, showIcons bool, showBranches bool, isBlocked bool) string {
+	return RenderPRWithContinuation(pr, prefix, "", showIcons, showBranches, isBlocked)
+}
+
+// RenderPRWithContinuation renders a PR with a specific continuation prefix for detail lines.
+// The continuationPrefix is used for lines 2-4 (status, branches, URL) to maintain tree structure.
+// If continuationPrefix is empty, spaces are used (flat list behavior).
+func RenderPRWithContinuation(pr *models.PR, prefix string, continuationPrefix string, showIcons bool, showBranches bool, isBlocked bool) string {
 	var b strings.Builder
 
 	// Line 1: Number and title
@@ -25,8 +32,15 @@ func RenderPR(pr *models.PR, prefix string, showIcons bool, showBranches bool, i
 	}
 	b.WriteString("\n")
 
-	// Calculate indent based on prefix length
-	indent := strings.Repeat(" ", len(prefix)+4)
+	// Calculate indent for detail lines
+	// If we have a continuation prefix (tree context), use it plus spacing
+	// Otherwise fall back to spaces based on prefix length
+	var indent string
+	if continuationPrefix != "" {
+		indent = continuationPrefix + "    " // 4 spaces after tree character
+	} else {
+		indent = strings.Repeat(" ", len(prefix)+4)
+	}
 
 	// Line 2: Status details
 	b.WriteString(indent)
