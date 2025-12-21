@@ -6,10 +6,11 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag to release (e.g., v1.0.0)"
+      snapshot:
+        description: "Run in snapshot mode (no publish)"
         required: false
-        type: string
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -31,7 +32,8 @@ jobs:
       - name: Run tests
         run: go test ./...
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser (Release)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -39,7 +41,14 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Personal access token with repo scope for pushing to homebrew-tap
-          # Create at: https://github.com/settings/tokens
-          # Add as repository secret: Settings > Secrets > Actions > HOMEBREW_TAP_TOKEN
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Run GoReleaser (Snapshot)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
