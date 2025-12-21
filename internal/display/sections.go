@@ -110,9 +110,9 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 	// Render non-stacked PRs
 	for _, pr := range nonStackedPRs {
 		isLast := itemIdx == totalItems-1
-		prefix := TreeStyle.Render(TreeBranch)
+		prefix := TreeStyle.Render(TreeBranch) + " "
 		if isLast {
-			prefix = TreeStyle.Render(TreeLastBranch)
+			prefix = TreeStyle.Render(TreeLastBranch) + " "
 		}
 		b.WriteString(RenderPR(pr, prefix, showIcons, showBranches, false))
 		itemIdx++
