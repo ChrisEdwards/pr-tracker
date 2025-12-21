@@ -31,20 +31,16 @@ brew tap ChrisEdwards/tap
 brew install prt
 ```
 
-### Go Install
-
-```bash
-go install github.com/ChrisEdwards/prt@latest
-```
-
 ### Binary Download
 
-Download pre-built binaries from [Releases](https://github.com/ChrisEdwards/prt/releases).
+Download pre-built binaries from [Releases](https://github.com/ChrisEdwards/pr-tracker/releases).
 
 Available platforms:
-- macOS (Intel): `prt-darwin-amd64.tar.gz`
-- macOS (Apple Silicon): `prt-darwin-arm64.tar.gz`
-- Linux (x64): `prt-linux-amd64.tar.gz`
+- macOS (Intel): `prt_<version>_darwin_amd64.tar.gz`
+- macOS (Apple Silicon): `prt_<version>_darwin_arm64.tar.gz`
+- Linux (x64): `prt_<version>_linux_amd64.tar.gz`
+- Linux (arm64): `prt_<version>_linux_arm64.tar.gz`
+- Windows (x64): `prt_<version>_windows_amd64.zip`
 
 ### Build from Source
 
@@ -209,7 +205,7 @@ prt --json > ~/pr-snapshot.json
 ## Requirements
 
 - **GitHub CLI (`gh`)** - Must be installed and authenticated
-- **macOS or Linux** - Windows not currently supported
+- **macOS, Linux, or Windows** - Pre-built binaries available for all platforms
 - **Git repositories** - With GitHub remotes
 
 ## Troubleshooting
@@ -246,6 +242,27 @@ Contributions welcome! Please:
 3. Make your changes
 4. Run tests: `make test`
 5. Submit a pull request
+
+## Releasing
+
+Releases are automated via GitHub Actions and [goreleaser](https://goreleaser.com/).
+
+### Setup (one-time)
+
+1. Create a Personal Access Token at https://github.com/settings/tokens with `repo` scope
+2. Add it as a repository secret named `HOMEBREW_TAP_TOKEN` in Settings > Secrets > Actions
+
+### Creating a Release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers the release workflow which:
+- Builds binaries for all platforms (macOS, Linux, Windows)
+- Creates a GitHub release with changelog
+- Updates the Homebrew formula in [homebrew-tap](https://github.com/ChrisEdwards/homebrew-tap)
 
 ## License
 

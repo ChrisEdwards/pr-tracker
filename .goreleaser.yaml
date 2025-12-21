@@ -65,6 +65,33 @@ changelog:
       - Merge pull request
       - Merge branch
 
+brews:
+  - repository:
+      owner: ChrisEdwards
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/ChrisEdwards/pr-tracker"
+    description: "GitHub PR Tracker - Aggregate PR status across multiple repositories"
+    license: "MIT"
+    dependencies:
+      - name: gh
+        type: recommended
+    install: |
+      bin.install "prt"
+    test: |
+      system "#{bin}/prt", "--version"
+    caveats: |
+      PRT requires the GitHub CLI (gh) to be installed and authenticated.
+
+      If not already installed:
+        brew install gh
+
+      Then authenticate:
+        gh auth login
+
+      Run `prt` to start the setup wizard.
+
 release:
   github:
     owner: ChrisEdwards
