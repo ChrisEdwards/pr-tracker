@@ -60,17 +60,97 @@ func RenderSection(title string, icon string, prs []*models.PR, stacks map[strin
 }
 
 // renderPRsInSection renders a list of PRs within a section.
-// It determines blocked status based on stack information.
+// It uses stack tree structure for stacked PRs and flat rendering for non-stacked PRs.
 func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stack, showIcons bool, showBranches bool) {
-	for i, pr := range prs {
-		isLast := i == len(prs)-1
+	// Build a set of PR numbers that are part of a stack (for filtering)
+	stackedPRs := make(map[int]bool)
+	var stackRoots []*models.StackNode
+
+	if stack != nil {
+		// Find PRs in our list that are stack roots
+		prNumberSet := make(map[int]bool)
+		for _, pr := range prs {
+			prNumberSet[pr.Number] = true
+		}
+
+		// Collect all stacked PRs and identify roots in our PR list
+		for _, node := range stack.AllNodes {
+			if node.PR != nil {
+				stackedPRs[node.PR.Number] = true
+			}
+		}
+
+		// Find roots that are in our PR list
+		for _, root := range stack.Roots {
+			if root.PR != nil && prNumberSet[root.PR.Number] {
+				stackRoots = append(stackRoots, root)
+			}
+		}
+	}
+
+	// Collect non-stacked PRs (PRs not part of any stack)
+	var nonStackedPRs []*models.PR
+	for _, pr := range prs {
+		if !stackedPRs[pr.Number] {
+			nonStackedPRs = append(nonStackedPRs, pr)
+		}
+	}
+
+	// Calculate total items to render for determining last item
+	totalItems := len(stackRoots) + len(nonStackedPRs)
+	itemIdx := 0
+
+	// Render stack trees first (each root with its children)
+	for _, root := range stackRoots {
+		isLast := itemIdx == totalItems-1
+		renderStackNodeInSection(b, root, "", isLast, showIcons, showBranches)
+		itemIdx++
+	}
+
+	// Render non-stacked PRs
+	for _, pr := range nonStackedPRs {
+		isLast := itemIdx == totalItems-1
 		prefix := TreeBranch
 		if isLast {
 			prefix = TreeLastBranch
 		}
+		b.WriteString(RenderPR(pr, prefix, showIcons, showBranches, false))
+		itemIdx++
+	}
+}
 
-		isBlocked := isPRBlocked(pr, stack)
-		b.WriteString(RenderPR(pr, prefix, showIcons, showBranches, isBlocked))
+// renderStackNodeInSection recursively renders a stack node and its children within a section.
+// This provides tree-like indentation for stacked PRs.
+func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix string, isLast bool, showIcons bool, showBranches bool) {
+	if node == nil || node.PR == nil {
+		return
+	}
+
+	// Determine branch character
+	branch := TreeBranch
+	if isLast {
+		branch = TreeLastBranch
+	}
+
+	// Determine if this PR is blocked (has unmerged parent)
+	isBlocked := node.IsBlocked()
+
+	// Render the PR with tree prefix
+	prOutput := RenderPR(node.PR, prefix+branch+" ", showIcons, showBranches, isBlocked)
+	b.WriteString(prOutput)
+
+	// Calculate prefix for children
+	childPrefix := prefix
+	if isLast {
+		childPrefix += TreeIndent
+	} else {
+		childPrefix += TreeVertical + "   "
+	}
+
+	// Render children recursively
+	for i, child := range node.Children {
+		isLastChild := i == len(node.Children)-1
+		renderStackNodeInSection(b, child, childPrefix, isLastChild, showIcons, showBranches)
 	}
 }
 

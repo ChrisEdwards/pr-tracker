@@ -312,3 +312,159 @@ func TestGroupByRepo_WithOwner(t *testing.T) {
 		t.Error("org2/repo should have 1 PR")
 	}
 }
+
+// TestRenderSection_StackTreeRendering tests that stacked PRs are rendered as a nested tree
+func TestRenderSection_StackTreeRendering(t *testing.T) {
+	// Note: We don't call DisableColors() here as it can cause flaky tests
+	// when followed by tests that depend on style rendering. The tree tests
+	// use setupTreeTest which handles this but runs after TestStylesAreDefined.
+
+	// Create a 3-level stack: root -> child -> grandchild
+	rootPR := &models.PR{
+		Number:     101,
+		Title:      "Base feature PR",
+		URL:        "https://github.com/myorg/myrepo/pull/101",
+		RepoName:   "myrepo",
+		RepoOwner:  "myorg",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-base",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	childPR := &models.PR{
+		Number:     102,
+		Title:      "Child PR",
+		URL:        "https://github.com/myorg/myrepo/pull/102",
+		RepoName:   "myrepo",
+		RepoOwner:  "myorg",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-child",
+		BaseBranch: "feature-base",
+		CreatedAt:  time.Now(),
+	}
+	grandchildPR := &models.PR{
+		Number:     103,
+		Title:      "Grandchild PR",
+		URL:        "https://github.com/myorg/myrepo/pull/103",
+		RepoName:   "myrepo",
+		RepoOwner:  "myorg",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-grandchild",
+		BaseBranch: "feature-child",
+		CreatedAt:  time.Now(),
+	}
+
+	// Build stack structure
+	rootNode := &models.StackNode{PR: rootPR, Depth: 0}
+	childNode := &models.StackNode{PR: childPR, Parent: rootNode, Depth: 1}
+	grandchildNode := &models.StackNode{PR: grandchildPR, Parent: childNode, Depth: 2}
+
+	childNode.Children = []*models.StackNode{grandchildNode}
+	rootNode.Children = []*models.StackNode{childNode}
+
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{rootNode},
+		AllNodes: []*models.StackNode{rootNode, childNode, grandchildNode},
+	}
+
+	stacks := map[string]*models.Stack{
+		"myorg/myrepo": stack,
+	}
+
+	// Only include the root PR in the section (children should be rendered via stack)
+	prs := []*models.PR{rootPR}
+
+	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+
+	// All three PRs should be rendered (root plus its children from the stack)
+	if !strings.Contains(result, "#101") {
+		t.Error("Section should contain root PR #101")
+	}
+	if !strings.Contains(result, "#102") {
+		t.Error("Section should contain child PR #102 (rendered from stack)")
+	}
+	if !strings.Contains(result, "#103") {
+		t.Error("Section should contain grandchild PR #103 (rendered from stack)")
+	}
+
+	// Verify tree order: root should appear before child, child before grandchild
+	idx101 := strings.Index(result, "#101")
+	idx102 := strings.Index(result, "#102")
+	idx103 := strings.Index(result, "#103")
+
+	if idx101 > idx102 || idx102 > idx103 {
+		t.Error("PRs should appear in tree order: #101 -> #102 -> #103")
+	}
+}
+
+// TestRenderSection_StackedAndNonStacked tests rendering when both stacked and non-stacked PRs exist
+func TestRenderSection_StackedAndNonStacked(t *testing.T) {
+	// Note: We don't call DisableColors() here - see TestRenderSection_StackTreeRendering
+
+	// Create a stacked PR pair
+	stackedRoot := &models.PR{
+		Number:     1,
+		Title:      "Stacked Root",
+		URL:        "https://github.com/org/repo/pull/1",
+		RepoName:   "repo",
+		RepoOwner:  "org",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	stackedChild := &models.PR{
+		Number:     2,
+		Title:      "Stacked Child",
+		URL:        "https://github.com/org/repo/pull/2",
+		RepoName:   "repo",
+		RepoOwner:  "org",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-2",
+		BaseBranch: "feature",
+		CreatedAt:  time.Now(),
+	}
+
+	// Create a non-stacked PR
+	nonStackedPR := &models.PR{
+		Number:     99,
+		Title:      "Independent PR",
+		URL:        "https://github.com/org/repo/pull/99",
+		RepoName:   "repo",
+		RepoOwner:  "org",
+		State:      models.PRStateOpen,
+		HeadBranch: "fix",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+
+	// Build stack
+	rootNode := &models.StackNode{PR: stackedRoot, Depth: 0}
+	childNode := &models.StackNode{PR: stackedChild, Parent: rootNode, Depth: 1}
+	rootNode.Children = []*models.StackNode{childNode}
+
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{rootNode},
+		AllNodes: []*models.StackNode{rootNode, childNode},
+	}
+
+	stacks := map[string]*models.Stack{
+		"org/repo": stack,
+	}
+
+	// Include root and non-stacked in the PR list
+	prs := []*models.PR{stackedRoot, nonStackedPR}
+
+	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+
+	// All three should appear
+	if !strings.Contains(result, "#1") {
+		t.Error("Should contain stacked root #1")
+	}
+	if !strings.Contains(result, "#2") {
+		t.Error("Should contain stacked child #2 (from stack tree)")
+	}
+	if !strings.Contains(result, "#99") {
+		t.Error("Should contain non-stacked PR #99")
+	}
+}
