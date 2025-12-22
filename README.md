@@ -82,6 +82,9 @@ prt -p ~/code/work
 # Filter repos by pattern
 prt -f "api-*"
 
+# Show newest PRs first
+prt -s newest
+
 # Output as JSON for scripting
 prt --json | jq '.needsMyAttention | length'
 
@@ -96,6 +99,7 @@ prt --no-color > prs.txt
 | `--path` | `-p` | Override search paths from config |
 | `--filter` | `-f` | Filter repos by name pattern (glob) |
 | `--group` | `-g` | Group by: `project` or `author` |
+| `--sort` | `-s` | Sort by: `oldest` or `newest` |
 | `--depth` | `-d` | Scan depth (default: 3) |
 | `--max-age` | | Hide PRs older than N days (0 = no limit) |
 | `--json` | | Output as JSON |

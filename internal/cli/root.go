@@ -39,6 +39,7 @@ shows stacked PR relationships.`,
 	flagPath    string
 	flagFilter  string
 	flagGroup   string
+	flagSort    string
 	flagDepth   int
 	flagMaxAge  int
 	flagJSON    bool
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&flagPath, "path", "p", "", "Search path (overrides config)")
 	rootCmd.Flags().StringVarP(&flagFilter, "filter", "f", "", "Filter repos by name pattern (glob)")
 	rootCmd.Flags().StringVarP(&flagGroup, "group", "g", "", "Group by: project, author")
+	rootCmd.Flags().StringVarP(&flagSort, "sort", "s", "", "Sort by: oldest, newest")
 	rootCmd.Flags().IntVarP(&flagDepth, "depth", "d", 0, "Scan depth (0 uses config default)")
 	rootCmd.Flags().IntVar(&flagMaxAge, "max-age", 0, "Hide PRs older than N days (0 uses config default)")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON")
@@ -79,6 +81,7 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		Path:   flagPath,
 		Filter: flagFilter,
 		Group:  flagGroup,
+		Sort:   flagSort,
 		Depth:  flagDepth,
 		MaxAge: flagMaxAge,
 	}

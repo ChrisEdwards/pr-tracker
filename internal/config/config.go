@@ -66,6 +66,7 @@ type Flags struct {
 	Path    string // Override search_paths with a single path
 	Filter  string // Filter repos by pattern
 	Group   string // Override default_group_by
+	Sort    string // Override default_sort
 	Depth   int    // Override scan_depth
 	MaxAge  int    // Override max_pr_age_days
 	JSON    bool   // Output in JSON format
@@ -122,6 +123,9 @@ func Load(flags *Flags) (*Config, error) {
 		}
 		if flags.Group != "" {
 			v.Set("default_group_by", flags.Group)
+		}
+		if flags.Sort != "" {
+			v.Set("default_sort", flags.Sort)
 		}
 		if flags.Filter != "" {
 			v.Set("include_repos", []string{flags.Filter})
