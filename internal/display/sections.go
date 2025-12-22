@@ -87,13 +87,131 @@ func renderByAuthor(b *strings.Builder, prs []*models.PR, stacks map[string]*mod
 		b.WriteString(AuthorStyle.Render(fmt.Sprintf("[@%s]", authorName)))
 		b.WriteString("\n")
 
-		// Render PRs (show repo name instead of author since we're grouped by author)
-		// Note: stacks are keyed by repo, so we pass nil for stack in author mode
-		// Stack visualization doesn't make as much sense when grouped by author
-		renderPRsInSection(b, authorPRs, nil, opts.ShowIcons, opts.ShowBranches, true)
+		// Render PRs with proper stack relationships across repos
+		renderPRsForAuthorGroup(b, authorPRs, stacks, opts)
 
 		b.WriteString("\n")
 	}
+}
+
+// renderPRsForAuthorGroup renders an author's PRs across multiple repos with proper stack relationships.
+// It sub-groups by repo to use stack information while maintaining correct tree line indices.
+func renderPRsForAuthorGroup(b *strings.Builder, prs []*models.PR, stacks map[string]*models.Stack, opts SectionOptions) {
+	byRepo := groupByRepo(prs)
+	repoNames := sortedRepoNames(byRepo)
+
+	// First pass: count total top-level items across all repos
+	totalItems := 0
+	for _, repoName := range repoNames {
+		repoPRs := byRepo[repoName]
+		stack := stacks[repoName]
+		totalItems += countTopLevelItems(repoPRs, stack)
+	}
+
+	// Create base render options
+	prOpts := PRRenderOptions{
+		ShowIcons:               opts.ShowIcons,
+		ShowBranches:            opts.ShowBranches,
+		ShowRepoInsteadOfAuthor: true,
+	}
+
+	// Second pass: render all repos with correct global indices
+	itemIdx := 0
+	for _, repoName := range repoNames {
+		repoPRs := byRepo[repoName]
+		stack := stacks[repoName]
+
+		// Build a set of PR numbers that are part of a stack (for filtering)
+		stackedPRs := make(map[int]bool)
+		var stackRoots []*models.StackNode
+
+		if stack != nil {
+			prNumberSet := make(map[int]bool)
+			for _, pr := range repoPRs {
+				prNumberSet[pr.Number] = true
+			}
+
+			for _, node := range stack.AllNodes {
+				if node.PR != nil {
+					stackedPRs[node.PR.Number] = true
+				}
+			}
+
+			for _, root := range stack.Roots {
+				if root.PR != nil && prNumberSet[root.PR.Number] {
+					stackRoots = append(stackRoots, root)
+				}
+			}
+		}
+
+		// Collect non-stacked PRs
+		var nonStackedPRs []*models.PR
+		for _, pr := range repoPRs {
+			if !stackedPRs[pr.Number] {
+				nonStackedPRs = append(nonStackedPRs, pr)
+			}
+		}
+
+		// Render stack trees
+		for _, root := range stackRoots {
+			isLast := itemIdx == totalItems-1
+			renderStackNodeInSection(b, root, "", isLast, prOpts)
+			itemIdx++
+		}
+
+		// Render non-stacked PRs
+		for _, pr := range nonStackedPRs {
+			isLast := itemIdx == totalItems-1
+			prefix := TreeStyle.Render(TreeBranch) + " "
+			if isLast {
+				prefix = TreeStyle.Render(TreeLastBranch) + " "
+			}
+
+			var continuationPrefix string
+			if !isLast {
+				continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
+			} else {
+				continuationPrefix = TreeIndent
+			}
+
+			b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
+			itemIdx++
+		}
+	}
+}
+
+// countTopLevelItems counts the number of top-level renderable items (stack roots + non-stacked PRs).
+func countTopLevelItems(prs []*models.PR, stack *models.Stack) int {
+	stackedPRs := make(map[int]bool)
+	stackRootsCount := 0
+
+	if stack != nil {
+		prNumberSet := make(map[int]bool)
+		for _, pr := range prs {
+			prNumberSet[pr.Number] = true
+		}
+
+		for _, node := range stack.AllNodes {
+			if node.PR != nil {
+				stackedPRs[node.PR.Number] = true
+			}
+		}
+
+		for _, root := range stack.Roots {
+			if root.PR != nil && prNumberSet[root.PR.Number] {
+				stackRootsCount++
+			}
+		}
+	}
+
+	nonStackedCount := 0
+	for _, pr := range prs {
+		if !stackedPRs[pr.Number] {
+			nonStackedCount++
+		}
+	}
+
+	return stackRootsCount + nonStackedCount
 }
 
 // renderPRsInSection renders a list of PRs within a section.

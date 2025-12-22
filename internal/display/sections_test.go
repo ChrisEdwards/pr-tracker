@@ -570,3 +570,180 @@ func TestRenderSection_GroupByProject_Default(t *testing.T) {
 		t.Error("Default grouping should NOT have author header as group")
 	}
 }
+
+// TestRenderSection_GroupByAuthor_WithStacks tests that stacked PRs show parent-child relationships in author mode
+func TestRenderSection_GroupByAuthor_WithStacks(t *testing.T) {
+	// Create stacked PRs for alice in a single repo
+	parentPR := &models.PR{
+		Number:     1,
+		Title:      "Parent PR",
+		URL:        "https://github.com/org/repo/pull/1",
+		RepoName:   "repo",
+		RepoOwner:  "org",
+		Author:     "alice",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-a",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	childPR := &models.PR{
+		Number:     2,
+		Title:      "Child PR",
+		URL:        "https://github.com/org/repo/pull/2",
+		RepoName:   "repo",
+		RepoOwner:  "org",
+		Author:     "alice",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-b",
+		BaseBranch: "feature-a", // Depends on parent
+		CreatedAt:  time.Now(),
+	}
+
+	// Create stack structure
+	parentNode := &models.StackNode{PR: parentPR, Depth: 0}
+	childNode := &models.StackNode{PR: childPR, Parent: parentNode, Depth: 1}
+	parentNode.Children = []*models.StackNode{childNode}
+
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{parentNode},
+		AllNodes: []*models.StackNode{parentNode, childNode},
+	}
+
+	stacks := map[string]*models.Stack{
+		"org/repo": stack,
+	}
+
+	prs := []*models.PR{parentPR, childPR}
+
+	result := RenderSection("TEAM PRS", "", prs, stacks, SectionOptions{
+		ShowIcons:    false,
+		ShowBranches: false,
+		GroupBy:      "author",
+	})
+
+	// Should have author header
+	if !strings.Contains(result, "[@alice]") {
+		t.Error("Author grouping should show [@alice] header")
+	}
+
+	// Both PRs should appear
+	if !strings.Contains(result, "#1") {
+		t.Error("Should contain parent PR #1")
+	}
+	if !strings.Contains(result, "#2") {
+		t.Error("Should contain child PR #2")
+	}
+
+	// Parent should appear before child (tree order)
+	idx1 := strings.Index(result, "#1")
+	idx2 := strings.Index(result, "#2")
+	if idx1 > idx2 {
+		t.Error("Parent PR #1 should appear before child PR #2 (tree order)")
+	}
+}
+
+// TestRenderSection_GroupByAuthor_StacksAcrossRepos tests that stacks work when author has PRs in multiple repos
+func TestRenderSection_GroupByAuthor_StacksAcrossRepos(t *testing.T) {
+	// Alice has:
+	// - repo-a: stacked PRs (1 -> 2)
+	// - repo-b: independent PR (3)
+	stackedRoot := &models.PR{
+		Number:     1,
+		Title:      "Stacked Root",
+		URL:        "https://github.com/org/repo-a/pull/1",
+		RepoName:   "repo-a",
+		RepoOwner:  "org",
+		Author:     "alice",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	stackedChild := &models.PR{
+		Number:     2,
+		Title:      "Stacked Child",
+		URL:        "https://github.com/org/repo-a/pull/2",
+		RepoName:   "repo-a",
+		RepoOwner:  "org",
+		Author:     "alice",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-2",
+		BaseBranch: "feature",
+		CreatedAt:  time.Now(),
+	}
+	independentPR := &models.PR{
+		Number:    3,
+		Title:     "Independent PR",
+		URL:       "https://github.com/org/repo-b/pull/3",
+		RepoName:  "repo-b",
+		RepoOwner: "org",
+		Author:    "alice",
+		State:     models.PRStateOpen,
+		CreatedAt: time.Now(),
+	}
+
+	// Build stack for repo-a
+	rootNode := &models.StackNode{PR: stackedRoot, Depth: 0}
+	childNode := &models.StackNode{PR: stackedChild, Parent: rootNode, Depth: 1}
+	rootNode.Children = []*models.StackNode{childNode}
+
+	stacks := map[string]*models.Stack{
+		"org/repo-a": {
+			Roots:    []*models.StackNode{rootNode},
+			AllNodes: []*models.StackNode{rootNode, childNode},
+		},
+	}
+
+	prs := []*models.PR{stackedRoot, stackedChild, independentPR}
+
+	result := RenderSection("TEAM PRS", "", prs, stacks, SectionOptions{
+		ShowIcons:    false,
+		ShowBranches: false,
+		GroupBy:      "author",
+	})
+
+	// All three PRs should appear
+	if !strings.Contains(result, "#1") {
+		t.Error("Should contain stacked root #1")
+	}
+	if !strings.Contains(result, "#2") {
+		t.Error("Should contain stacked child #2")
+	}
+	if !strings.Contains(result, "#3") {
+		t.Error("Should contain independent #3")
+	}
+
+	// Author header should be present
+	if !strings.Contains(result, "[@alice]") {
+		t.Error("Should contain author header [@alice]")
+	}
+}
+
+// TestCountTopLevelItems tests the helper function
+func TestCountTopLevelItems(t *testing.T) {
+	// Test with no stack
+	prs := []*models.PR{{Number: 1}, {Number: 2}, {Number: 3}}
+	count := countTopLevelItems(prs, nil)
+	if count != 3 {
+		t.Errorf("Expected 3 top-level items with no stack, got %d", count)
+	}
+
+	// Test with stack where one PR is a child
+	parentPR := &models.PR{Number: 1}
+	childPR := &models.PR{Number: 2}
+	parentNode := &models.StackNode{PR: parentPR}
+	childNode := &models.StackNode{PR: childPR, Parent: parentNode}
+	parentNode.Children = []*models.StackNode{childNode}
+
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{parentNode},
+		AllNodes: []*models.StackNode{parentNode, childNode},
+	}
+
+	prs2 := []*models.PR{parentPR, childPR, {Number: 3}}
+	count = countTopLevelItems(prs2, stack)
+	// Expected: 1 stack root + 1 non-stacked = 2 top-level items
+	if count != 2 {
+		t.Errorf("Expected 2 top-level items (1 stack root + 1 non-stacked), got %d", count)
+	}
+}
