@@ -30,6 +30,7 @@ type Spinner struct {
 	count    int
 	running  bool
 	stopCh   chan struct{}
+	doneCh   chan struct{}
 	style    lipgloss.Style
 	useASCII bool
 }
@@ -62,6 +63,7 @@ func (s *Spinner) Start(message string) {
 	s.count = 0
 	s.frame = 0
 	s.stopCh = make(chan struct{})
+	s.doneCh = make(chan struct{})
 	s.mu.Unlock()
 
 	go s.animate()
@@ -81,7 +83,7 @@ func (s *Spinner) UpdateMessage(message string) {
 	s.message = message
 }
 
-// Stop halts the spinner animation.
+// Stop halts the spinner animation and waits for it to complete.
 func (s *Spinner) Stop() {
 	s.mu.Lock()
 	if !s.running {
@@ -90,13 +92,18 @@ func (s *Spinner) Stop() {
 	}
 	s.running = false
 	close(s.stopCh)
+	doneCh := s.doneCh
 	s.mu.Unlock()
+
+	// Wait for the goroutine to finish
+	<-doneCh
 }
 
 // animate runs the spinner animation loop.
 func (s *Spinner) animate() {
 	ticker := time.NewTicker(SpinnerInterval)
 	defer ticker.Stop()
+	defer close(s.doneCh)
 
 	s.render()
 
@@ -138,6 +145,8 @@ func (s *Spinner) render() {
 
 // clearLine clears the current line.
 func (s *Spinner) clearLine() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	fmt.Fprint(s.writer, "\r\033[K")
 }
 
