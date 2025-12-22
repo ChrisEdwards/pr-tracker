@@ -72,6 +72,10 @@ show_icons: {{.ShowIcons}}
 # Show "Other PRs" section (external contributors, bots, etc.)
 # Default: false (hidden to reduce noise)
 show_other_prs: {{.ShowOtherPRs}}
+
+# Hide PRs older than this many days (0 = no limit)
+# Useful for filtering out stale/long-running PRs
+max_pr_age_days: {{.MaxPRAgeDays}}
 `
 
 // GenerateConfigFile generates a well-commented YAML config file from the given config.

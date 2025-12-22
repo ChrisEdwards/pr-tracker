@@ -139,6 +139,9 @@ default_sort: "oldest"       # oldest | newest
 show_branch_name: true
 show_icons: true
 show_other_prs: false        # Show "Other PRs" section
+
+# Filtering options
+max_pr_age_days: 0           # Hide PRs older than N days (0 = no limit)
 ```
 
 ### Configuration Options
@@ -156,6 +159,7 @@ show_other_prs: false        # Show "Other PRs" section
 | `show_branch_name` | `true` | Show branch names |
 | `show_icons` | `true` | Show emoji icons |
 | `show_other_prs` | `false` | Show "Other PRs" section |
+| `max_pr_age_days` | `0` | Hide PRs older than N days (0 = no limit) |
 
 ## Output Categories
 
