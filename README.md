@@ -12,6 +12,8 @@ PRT solves "PR Fatigue" - the cognitive burden of tracking PRs across many repos
 - **Team PRs** - PRs from your configured team members
 - **Stacked PRs** - Visual tree of dependent PR chains
 
+![PRT Preview](assets/prt-preview.png)
+
 ## Features
 
 - **Multi-repo scanning** - Discover Git repos in configured directories
