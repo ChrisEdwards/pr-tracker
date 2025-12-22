@@ -209,9 +209,62 @@ prt --json | jq '.needs_my_attention | length'
 # List all PR URLs
 prt --json | jq '.my_prs[].url'
 
+# Get scan metadata
+prt --json | jq '{repos: .total_repos_scanned, prs: .total_prs_found, user: .username}'
+
 # Export to file
 prt --json > ~/pr-snapshot.json
 ```
+
+### JSON Schema
+
+Top-level structure:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `my_prs` | `PR[]` | PRs you authored |
+| `needs_my_attention` | `PR[]` | PRs requesting your review or assigned to you |
+| `team_prs` | `PR[]` | PRs from your configured team members |
+| `other_prs` | `PR[]` | All other PRs |
+| `repos_with_prs` | `Repository[]` | Repositories with open PRs |
+| `repos_without_prs` | `Repository[]` | Repositories with no open PRs |
+| `repos_with_errors` | `Repository[]` | Repositories that failed to scan |
+| `stacks` | `object` | Map of repo name to Stack (stacked PRs) |
+| `total_repos_scanned` | `int` | Number of repositories scanned |
+| `total_prs_found` | `int` | Total PR count |
+| `scan_duration_ns` | `int` | Scan time in nanoseconds |
+| `username` | `string` | Your GitHub username |
+
+PR object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `number` | `int` | PR number |
+| `title` | `string` | PR title |
+| `url` | `string` | GitHub URL |
+| `author` | `string` | Author's GitHub username |
+| `state` | `string` | `OPEN`, `DRAFT`, `MERGED`, or `CLOSED` |
+| `is_draft` | `bool` | Whether PR is a draft |
+| `base_branch` | `string` | Target branch (e.g., `main`) |
+| `head_branch` | `string` | Source branch |
+| `created_at` | `string` | ISO 8601 timestamp |
+| `ci_status` | `string` | `passing`, `failing`, `pending`, or `none` |
+| `review_requests` | `string[]` | Usernames requested to review |
+| `assignees` | `string[]` | Assigned usernames |
+| `reviews` | `Review[]` | Code reviews |
+| `repo_name` | `string` | Repository name |
+| `repo_owner` | `string` | Repository owner |
+
+Repository object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Repository name |
+| `path` | `string` | Local filesystem path |
+| `remote_url` | `string` | Git remote URL |
+| `owner` | `string` | GitHub owner/org |
+| `prs` | `PR[]` | PRs in this repository |
+| `scan_status` | `string` | `success`, `no_prs`, `error`, or `skipped` |
 
 ## Requirements
 
