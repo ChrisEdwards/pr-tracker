@@ -159,7 +159,17 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 		if isLast {
 			prefix = TreeStyle.Render(TreeLastBranch) + " "
 		}
-		b.WriteString(RenderPR(pr, prefix, prOpts))
+
+		// Calculate continuation prefix for detail lines (status, branches, URL)
+		// Show vertical bar if there are more items below
+		var continuationPrefix string
+		if !isLast {
+			continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
+		} else {
+			continuationPrefix = TreeIndent
+		}
+
+		b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
 		itemIdx++
 	}
 }
