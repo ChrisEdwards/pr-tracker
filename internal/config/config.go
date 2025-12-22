@@ -67,6 +67,7 @@ type Flags struct {
 	Filter  string // Filter repos by pattern
 	Group   string // Override default_group_by
 	Depth   int    // Override scan_depth
+	MaxAge  int    // Override max_pr_age_days
 	JSON    bool   // Output in JSON format
 	NoColor bool   // Disable colored output
 }
@@ -124,6 +125,9 @@ func Load(flags *Flags) (*Config, error) {
 		}
 		if flags.Filter != "" {
 			v.Set("include_repos", []string{flags.Filter})
+		}
+		if flags.MaxAge > 0 {
+			v.Set("max_pr_age_days", flags.MaxAge)
 		}
 	}
 

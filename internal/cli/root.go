@@ -40,6 +40,7 @@ shows stacked PR relationships.`,
 	flagFilter  string
 	flagGroup   string
 	flagDepth   int
+	flagMaxAge  int
 	flagJSON    bool
 	flagNoColor bool
 )
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&flagFilter, "filter", "f", "", "Filter repos by name pattern (glob)")
 	rootCmd.Flags().StringVarP(&flagGroup, "group", "g", "", "Group by: project, author")
 	rootCmd.Flags().IntVarP(&flagDepth, "depth", "d", 0, "Scan depth (0 uses config default)")
+	rootCmd.Flags().IntVar(&flagMaxAge, "max-age", 0, "Hide PRs older than N days (0 uses config default)")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON")
 	rootCmd.Flags().BoolVar(&flagNoColor, "no-color", false, "Disable colored output")
 }
@@ -78,6 +80,7 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		Filter: flagFilter,
 		Group:  flagGroup,
 		Depth:  flagDepth,
+		MaxAge: flagMaxAge,
 	}
 
 	cfg, err := config.Load(flags)

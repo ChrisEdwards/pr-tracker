@@ -95,6 +95,7 @@ prt --no-color > prs.txt
 | `--filter` | `-f` | Filter repos by name pattern (glob) |
 | `--group` | `-g` | Group by: `project` or `author` |
 | `--depth` | `-d` | Scan depth (default: 3) |
+| `--max-age` | | Hide PRs older than N days (0 = no limit) |
 | `--json` | | Output as JSON |
 | `--no-color` | | Disable colored output |
 | `--version` | `-v` | Show version |
