@@ -33,7 +33,7 @@ func TestRenderSectionHeader_IconDisabled(t *testing.T) {
 }
 
 func TestRenderSection_Empty(t *testing.T) {
-	result := RenderSection("MY PRS", IconMyPRs, nil, nil, false, false)
+	result := RenderSection("MY PRS", IconMyPRs, nil, nil, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	if !strings.Contains(result, "MY PRS") {
 		t.Error("Section should contain title")
@@ -44,7 +44,7 @@ func TestRenderSection_Empty(t *testing.T) {
 }
 
 func TestRenderSection_EmptyNeedsAttention(t *testing.T) {
-	result := RenderSection("NEEDS MY ATTENTION", IconNeedsAttention, nil, nil, false, false)
+	result := RenderSection("NEEDS MY ATTENTION", IconNeedsAttention, nil, nil, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	if !strings.Contains(result, "you're all caught up") {
 		t.Error("Empty NEEDS MY ATTENTION should show encouraging message")
@@ -64,7 +64,7 @@ func TestRenderSection_WithPRs(t *testing.T) {
 		},
 	}
 
-	result := RenderSection("MY PRS", IconMyPRs, prs, nil, false, false)
+	result := RenderSection("MY PRS", IconMyPRs, prs, nil, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	if !strings.Contains(result, "MY PRS") {
 		t.Error("Section should contain title")
@@ -87,7 +87,7 @@ func TestRenderSection_GroupedByRepo(t *testing.T) {
 		{Number: 3, Title: "PR 3", RepoName: "repo-b", URL: "http://x/3", State: models.PRStateOpen, CreatedAt: time.Now()},
 	}
 
-	result := RenderSection("TEST", "", prs, nil, false, false)
+	result := RenderSection("TEST", "", prs, nil, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	// repo-a should appear before repo-b (alphabetical)
 	idxA := strings.Index(result, "[repo-a]")
@@ -234,7 +234,7 @@ func TestRenderSection_StackLookupIntegration(t *testing.T) {
 	prs := []*models.PR{parentPR, childPR}
 
 	// Render section - this should now correctly look up the stack
-	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+	result := RenderSection("MY PRS", "", prs, stacks, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	// Verify the section renders both PRs
 	if !strings.Contains(result, "#1") {
@@ -336,7 +336,7 @@ func TestRenderSection_StackTreeRendering(t *testing.T) {
 	// Only include the root PR in the section (children should be rendered via stack)
 	prs := []*models.PR{rootPR}
 
-	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+	result := RenderSection("MY PRS", "", prs, stacks, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	// All three PRs should be rendered (root plus its children from the stack)
 	if !strings.Contains(result, "#101") {
@@ -417,7 +417,7 @@ func TestRenderSection_StackedAndNonStacked(t *testing.T) {
 	// Include root and non-stacked in the PR list
 	prs := []*models.PR{stackedRoot, nonStackedPR}
 
-	result := RenderSection("MY PRS", "", prs, stacks, false, false)
+	result := RenderSection("MY PRS", "", prs, stacks, SectionOptions{ShowIcons: false, ShowBranches: false})
 
 	// All three should appear
 	if !strings.Contains(result, "#1") {
@@ -428,5 +428,145 @@ func TestRenderSection_StackedAndNonStacked(t *testing.T) {
 	}
 	if !strings.Contains(result, "#99") {
 		t.Error("Should contain non-stacked PR #99")
+	}
+}
+
+// TestGroupByAuthor tests that PRs are correctly grouped by author
+func TestGroupByAuthor(t *testing.T) {
+	prs := []*models.PR{
+		{Number: 1, Author: "alice", RepoName: "repo-a"},
+		{Number: 2, Author: "bob", RepoName: "repo-a"},
+		{Number: 3, Author: "alice", RepoName: "repo-b"},
+		{Number: 4, Author: "", RepoName: "repo-c"}, // No author - should go to "unknown"
+	}
+
+	grouped := groupByAuthor(prs)
+
+	if len(grouped["alice"]) != 2 {
+		t.Error("alice should have 2 PRs")
+	}
+	if len(grouped["bob"]) != 1 {
+		t.Error("bob should have 1 PR")
+	}
+	if len(grouped["unknown"]) != 1 {
+		t.Error("unknown should have 1 PR for empty author")
+	}
+}
+
+// TestSortedAuthorNames tests that author names are sorted alphabetically
+func TestSortedAuthorNames(t *testing.T) {
+	byAuthor := map[string][]*models.PR{
+		"zebra":   {},
+		"alice":   {},
+		"charlie": {},
+	}
+
+	names := sortedAuthorNames(byAuthor)
+
+	if len(names) != 3 {
+		t.Errorf("Expected 3 names, got %d", len(names))
+	}
+	if names[0] != "alice" || names[1] != "charlie" || names[2] != "zebra" {
+		t.Errorf("Names not sorted: %v", names)
+	}
+}
+
+// TestRenderSection_GroupByAuthor tests that the section renders correctly when grouped by author
+func TestRenderSection_GroupByAuthor(t *testing.T) {
+	prs := []*models.PR{
+		{
+			Number:    1,
+			Title:     "Alice's first PR",
+			URL:       "https://github.com/org/repo-a/pull/1",
+			RepoName:  "repo-a",
+			RepoOwner: "org",
+			Author:    "alice",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+		{
+			Number:    2,
+			Title:     "Bob's PR",
+			URL:       "https://github.com/org/repo-b/pull/2",
+			RepoName:  "repo-b",
+			RepoOwner: "org",
+			Author:    "bob",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+		{
+			Number:    3,
+			Title:     "Alice's second PR",
+			URL:       "https://github.com/org/repo-c/pull/3",
+			RepoName:  "repo-c",
+			RepoOwner: "org",
+			Author:    "alice",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	result := RenderSection("TEAM PRS", "", prs, nil, SectionOptions{
+		ShowIcons:    false,
+		ShowBranches: false,
+		GroupBy:      "author",
+	})
+
+	// Should have author headers
+	if !strings.Contains(result, "[@alice]") {
+		t.Error("Section should contain [@alice] author header")
+	}
+	if !strings.Contains(result, "[@bob]") {
+		t.Error("Section should contain [@bob] author header")
+	}
+
+	// alice should appear before bob (alphabetical)
+	idxAlice := strings.Index(result, "[@alice]")
+	idxBob := strings.Index(result, "[@bob]")
+	if idxAlice > idxBob {
+		t.Error("Authors should be sorted alphabetically (alice before bob)")
+	}
+
+	// Should contain all PRs
+	if !strings.Contains(result, "#1") {
+		t.Error("Section should contain PR #1")
+	}
+	if !strings.Contains(result, "#2") {
+		t.Error("Section should contain PR #2")
+	}
+	if !strings.Contains(result, "#3") {
+		t.Error("Section should contain PR #3")
+	}
+}
+
+// TestRenderSection_GroupByProject_Default tests default grouping is by project
+func TestRenderSection_GroupByProject_Default(t *testing.T) {
+	prs := []*models.PR{
+		{
+			Number:    1,
+			Title:     "Test PR",
+			URL:       "https://github.com/org/repo/pull/1",
+			RepoName:  "repo",
+			RepoOwner: "org",
+			Author:    "alice",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	// Empty GroupBy should default to project grouping
+	result := RenderSection("MY PRS", "", prs, nil, SectionOptions{
+		ShowIcons:    false,
+		ShowBranches: false,
+		GroupBy:      "", // Empty = default to project
+	})
+
+	// Should have repo header, not author header
+	if !strings.Contains(result, "[org/repo]") {
+		t.Error("Default grouping should show repo header")
+	}
+	// Should NOT have author header as the grouping header
+	if strings.Contains(result, "[@alice]") {
+		t.Error("Default grouping should NOT have author header as group")
 	}
 }

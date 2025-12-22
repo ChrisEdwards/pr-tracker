@@ -220,6 +220,7 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		ShowOtherPRs: cfg.ShowOtherPRs,
 		NoColor:      noColor,
 		JSON:         flagJSON,
+		GroupBy:      cfg.DefaultGroupBy,
 	})
 	if err != nil {
 		return fmt.Errorf("render error: %w", err)

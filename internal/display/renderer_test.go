@@ -23,7 +23,7 @@ func TestRenderPR_BasicOutput(t *testing.T) {
 		Reviews:    []models.Review{},
 	}
 
-	output := RenderPR(pr, TreeBranch, false, false, false)
+	output := RenderPR(pr, TreeBranch, PRRenderOptions{ShowIcons: false, ShowBranches: false, IsBlocked: false})
 
 	// Check PR number is present
 	if !strings.Contains(output, "#42") {
@@ -54,7 +54,7 @@ func TestRenderPR_WithBranches(t *testing.T) {
 		CIStatus:   models.CIStatusPassing,
 	}
 
-	output := RenderPR(pr, TreeBranch, false, true, false)
+	output := RenderPR(pr, TreeBranch, PRRenderOptions{ShowIcons: false, ShowBranches: true, IsBlocked: false})
 
 	// Check branch info is present
 	if !strings.Contains(output, "feature-branch") {
@@ -79,7 +79,7 @@ func TestRenderPR_DraftState(t *testing.T) {
 		CIStatus:  models.CIStatusNone,
 	}
 
-	output := RenderPR(pr, TreeBranch, false, false, false)
+	output := RenderPR(pr, TreeBranch, PRRenderOptions{ShowIcons: false, ShowBranches: false, IsBlocked: false})
 
 	if !strings.Contains(output, "Draft") {
 		t.Error("Output should indicate draft state")
@@ -97,7 +97,7 @@ func TestRenderPR_WithIcons(t *testing.T) {
 		CIStatus:  models.CIStatusPassing,
 	}
 
-	output := RenderPR(pr, TreeBranch, true, false, false)
+	output := RenderPR(pr, TreeBranch, PRRenderOptions{ShowIcons: true, ShowBranches: false, IsBlocked: false})
 
 	// Icons should be present when showIcons is true
 	if !strings.Contains(output, IconDraft) {
@@ -115,7 +115,7 @@ func TestRenderPR_BlockedStyle(t *testing.T) {
 		CIStatus:  models.CIStatusPassing,
 	}
 
-	blocked := RenderPR(pr, TreeBranch, false, false, true)
+	blocked := RenderPR(pr, TreeBranch, PRRenderOptions{ShowIcons: false, ShowBranches: false, IsBlocked: true})
 
 	// Verify blocked output contains required content
 	if !strings.Contains(blocked, "#42") {

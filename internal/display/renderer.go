@@ -8,24 +8,32 @@ import (
 	"prt/internal/models"
 )
 
+// PRRenderOptions configures how a single PR is rendered.
+type PRRenderOptions struct {
+	ShowIcons              bool
+	ShowBranches           bool
+	IsBlocked              bool
+	ShowRepoInsteadOfAuthor bool // When true, show [repo] instead of @author (for author grouping mode)
+}
+
 // RenderPR renders a single PR as a formatted row with tree prefix.
 // The prefix should be a tree character like TreeBranch or TreeLastBranch.
 // If isBlocked is true, the entire PR is rendered with dimmed styling.
-func RenderPR(pr *models.PR, prefix string, showIcons bool, showBranches bool, isBlocked bool) string {
-	return RenderPRWithContinuation(pr, prefix, "", showIcons, showBranches, isBlocked)
+func RenderPR(pr *models.PR, prefix string, opts PRRenderOptions) string {
+	return RenderPRWithContinuation(pr, prefix, "", opts)
 }
 
 // RenderPRWithContinuation renders a PR with a specific continuation prefix for detail lines.
 // The continuationPrefix is used for lines 2-4 (status, branches, URL) to maintain tree structure.
 // If continuationPrefix is empty, spaces are used (flat list behavior).
-func RenderPRWithContinuation(pr *models.PR, prefix string, continuationPrefix string, showIcons bool, showBranches bool, isBlocked bool) string {
+func RenderPRWithContinuation(pr *models.PR, prefix string, continuationPrefix string, opts PRRenderOptions) string {
 	var b strings.Builder
 
 	// Line 1: Number and title
 	// Note: prefix contains tree characters (│, └──, etc.) already styled with TreeStyle
 	// We must NOT wrap prefix in any style or it will override the tree styling
 	b.WriteString(prefix)
-	if isBlocked {
+	if opts.IsBlocked {
 		// Blocked PRs: dim the number and title, but preserve tree char styling
 		b.WriteString(BlockedStyle.Render(fmt.Sprintf("#%d %s", pr.Number, pr.Title)))
 	} else {
@@ -47,13 +55,19 @@ func RenderPRWithContinuation(pr *models.PR, prefix string, continuationPrefix s
 
 	// Line 2: Status details
 	b.WriteString(indent)
-	b.WriteString(formatStatusLine(pr, showIcons))
+	b.WriteString(formatStatusLine(pr, opts.ShowIcons))
 	b.WriteString("\n")
 
 	// Line 3: Branch info (optional)
-	if showBranches {
+	if opts.ShowBranches {
 		b.WriteString(indent)
-		if pr.Author != "" {
+		// Show repo or author depending on grouping mode
+		if opts.ShowRepoInsteadOfAuthor {
+			// When grouped by author, show repo name
+			b.WriteString(RepoStyle.Render(fmt.Sprintf("[%s]", pr.RepoFullName())))
+			b.WriteString(MetaStyle.Render(" · "))
+		} else if pr.Author != "" {
+			// When grouped by project, show author
 			b.WriteString(AuthorStyle.Render(fmt.Sprintf("@%s", pr.Author)))
 			b.WriteString(MetaStyle.Render(" · "))
 		}
@@ -203,16 +217,21 @@ func pluralize(count int) string {
 
 // RenderPRSimple renders a PR without tree prefix, for use outside of tree context.
 func RenderPRSimple(pr *models.PR, showIcons bool, showBranches bool) string {
-	return RenderPR(pr, "  ", showIcons, showBranches, false)
+	return RenderPR(pr, "  ", PRRenderOptions{
+		ShowIcons:    showIcons,
+		ShowBranches: showBranches,
+		IsBlocked:    false,
+	})
 }
 
 // RenderOptions configures the output rendering behavior.
 type RenderOptions struct {
-	ShowIcons    bool // Show emoji icons for sections and status
-	ShowBranches bool // Show branch names (head → base)
-	ShowOtherPRs bool // Show "Other PRs" section (external contributors, bots)
-	NoColor      bool // Disable all color output
-	JSON         bool // Output as JSON instead of styled text
+	ShowIcons    bool   // Show emoji icons for sections and status
+	ShowBranches bool   // Show branch names (head → base)
+	ShowOtherPRs bool   // Show "Other PRs" section (external contributors, bots)
+	NoColor      bool   // Disable all color output
+	JSON         bool   // Output as JSON instead of styled text
+	GroupBy      string // Group PRs by: "project" (default) or "author"
 }
 
 // Render orchestrates the complete terminal output from a ScanResult.
@@ -234,6 +253,13 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 
 	var b strings.Builder
 
+	// Create section options from render options
+	sectionOpts := SectionOptions{
+		ShowIcons:    opts.ShowIcons,
+		ShowBranches: opts.ShowBranches,
+		GroupBy:      opts.GroupBy,
+	}
+
 	// Header
 	b.WriteString(renderHeader())
 	b.WriteString("\n\n")
@@ -244,8 +270,7 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 		IconMyPRs,
 		result.MyPRs,
 		result.Stacks,
-		opts.ShowIcons,
-		opts.ShowBranches,
+		sectionOpts,
 	))
 	b.WriteString("\n")
 
@@ -255,8 +280,7 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 		IconNeedsAttention,
 		result.NeedsMyAttention,
 		result.Stacks,
-		opts.ShowIcons,
-		opts.ShowBranches,
+		sectionOpts,
 	))
 	b.WriteString("\n")
 
@@ -266,8 +290,7 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 		IconTeam,
 		result.TeamPRs,
 		result.Stacks,
-		opts.ShowIcons,
-		opts.ShowBranches,
+		sectionOpts,
 	))
 	b.WriteString("\n")
 
@@ -278,8 +301,7 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 			IconOther,
 			result.OtherPRs,
 			result.Stacks,
-			opts.ShowIcons,
-			opts.ShowBranches,
+			sectionOpts,
 		))
 		b.WriteString("\n")
 	}

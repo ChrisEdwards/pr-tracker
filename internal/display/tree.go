@@ -72,7 +72,12 @@ func renderNode(b *strings.Builder, node *models.StackNode, prefix string, isLas
 	}
 
 	// Render the PR with tree prefix and continuation for detail lines
-	prOutput := RenderPRWithContinuation(node.PR, prefix+styledBranch+" ", continuationPrefix, showIcons, showBranches, isBlocked)
+	opts := PRRenderOptions{
+		ShowIcons:    showIcons,
+		ShowBranches: showBranches,
+		IsBlocked:    isBlocked,
+	}
+	prOutput := RenderPRWithContinuation(node.PR, prefix+styledBranch+" ", continuationPrefix, opts)
 	b.WriteString(prOutput)
 
 	// Calculate prefix for children (used in their title lines)

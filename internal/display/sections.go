@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"prt/internal/config"
 	"prt/internal/models"
 )
 
@@ -17,13 +18,20 @@ func RenderSectionHeader(icon, title string, showIcons bool) string {
 	return HeaderStyle.Render(title)
 }
 
-// RenderSection renders a complete section with header and PRs grouped by repository.
+// SectionOptions configures how a section is rendered.
+type SectionOptions struct {
+	ShowIcons    bool
+	ShowBranches bool
+	GroupBy      string // "project" (default) or "author"
+}
+
+// RenderSection renders a complete section with header and PRs grouped by repository or author.
 // The stacks map provides stack information for determining blocked status.
-func RenderSection(title string, icon string, prs []*models.PR, stacks map[string]*models.Stack, showIcons bool, showBranches bool) string {
+func RenderSection(title string, icon string, prs []*models.PR, stacks map[string]*models.Stack, opts SectionOptions) string {
 	var b strings.Builder
 
 	// Header
-	b.WriteString(RenderSectionHeader(icon, title, showIcons))
+	b.WriteString(RenderSectionHeader(icon, title, opts.ShowIcons))
 	b.WriteString("\n\n")
 
 	// Empty state
@@ -37,7 +45,18 @@ func RenderSection(title string, icon string, prs []*models.PR, stacks map[strin
 		return b.String()
 	}
 
-	// Group by repo
+	// Group by author or project (repo)
+	if opts.GroupBy == config.GroupByAuthor {
+		renderByAuthor(&b, prs, stacks, opts)
+	} else {
+		renderByProject(&b, prs, stacks, opts)
+	}
+
+	return b.String()
+}
+
+// renderByProject renders PRs grouped by repository (the default mode).
+func renderByProject(b *strings.Builder, prs []*models.PR, stacks map[string]*models.Stack, opts SectionOptions) {
 	byRepo := groupByRepo(prs)
 	repoNames := sortedRepoNames(byRepo)
 
@@ -50,17 +69,37 @@ func RenderSection(title string, icon string, prs []*models.PR, stacks map[strin
 
 		// Render PRs
 		stack := stacks[repoName]
-		renderPRsInSection(&b, repoPRs, stack, showIcons, showBranches)
+		renderPRsInSection(b, repoPRs, stack, opts.ShowIcons, opts.ShowBranches, false)
 
 		b.WriteString("\n")
 	}
+}
 
-	return b.String()
+// renderByAuthor renders PRs grouped by author.
+func renderByAuthor(b *strings.Builder, prs []*models.PR, stacks map[string]*models.Stack, opts SectionOptions) {
+	byAuthor := groupByAuthor(prs)
+	authorNames := sortedAuthorNames(byAuthor)
+
+	for _, authorName := range authorNames {
+		authorPRs := byAuthor[authorName]
+
+		// Author header
+		b.WriteString(AuthorStyle.Render(fmt.Sprintf("[@%s]", authorName)))
+		b.WriteString("\n")
+
+		// Render PRs (show repo name instead of author since we're grouped by author)
+		// Note: stacks are keyed by repo, so we pass nil for stack in author mode
+		// Stack visualization doesn't make as much sense when grouped by author
+		renderPRsInSection(b, authorPRs, nil, opts.ShowIcons, opts.ShowBranches, true)
+
+		b.WriteString("\n")
+	}
 }
 
 // renderPRsInSection renders a list of PRs within a section.
 // It uses stack tree structure for stacked PRs and flat rendering for non-stacked PRs.
-func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stack, showIcons bool, showBranches bool) {
+// When showRepoInsteadOfAuthor is true, the repo name is shown instead of author (for author grouping mode).
+func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stack, showIcons bool, showBranches bool, showRepoInsteadOfAuthor bool) {
 	// Build a set of PR numbers that are part of a stack (for filtering)
 	stackedPRs := make(map[int]bool)
 	var stackRoots []*models.StackNode
@@ -99,10 +138,17 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 	totalItems := len(stackRoots) + len(nonStackedPRs)
 	itemIdx := 0
 
+	// Create base render options
+	prOpts := PRRenderOptions{
+		ShowIcons:               showIcons,
+		ShowBranches:            showBranches,
+		ShowRepoInsteadOfAuthor: showRepoInsteadOfAuthor,
+	}
+
 	// Render stack trees first (each root with its children)
 	for _, root := range stackRoots {
 		isLast := itemIdx == totalItems-1
-		renderStackNodeInSection(b, root, "", isLast, showIcons, showBranches)
+		renderStackNodeInSection(b, root, "", isLast, prOpts)
 		itemIdx++
 	}
 
@@ -113,14 +159,14 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 		if isLast {
 			prefix = TreeStyle.Render(TreeLastBranch) + " "
 		}
-		b.WriteString(RenderPR(pr, prefix, showIcons, showBranches, false))
+		b.WriteString(RenderPR(pr, prefix, prOpts))
 		itemIdx++
 	}
 }
 
 // renderStackNodeInSection recursively renders a stack node and its children within a section.
 // This provides tree-like indentation for stacked PRs.
-func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix string, isLast bool, showIcons bool, showBranches bool) {
+func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix string, isLast bool, opts PRRenderOptions) {
 	if node == nil || node.PR == nil {
 		return
 	}
@@ -155,7 +201,13 @@ func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix
 	}
 
 	// Render the PR with tree prefix and continuation for detail lines
-	prOutput := RenderPRWithContinuation(node.PR, prefix+branch+" ", continuationPrefix, showIcons, showBranches, isBlocked)
+	nodeOpts := PRRenderOptions{
+		ShowIcons:               opts.ShowIcons,
+		ShowBranches:            opts.ShowBranches,
+		IsBlocked:               isBlocked,
+		ShowRepoInsteadOfAuthor: opts.ShowRepoInsteadOfAuthor,
+	}
+	prOutput := RenderPRWithContinuation(node.PR, prefix+branch+" ", continuationPrefix, nodeOpts)
 	b.WriteString(prOutput)
 
 	// Calculate prefix for children (used in their title lines)
@@ -170,7 +222,7 @@ func renderStackNodeInSection(b *strings.Builder, node *models.StackNode, prefix
 	// Render children recursively
 	for i, child := range node.Children {
 		isLastChild := i == len(node.Children)-1
-		renderStackNodeInSection(b, child, childPrefix, isLastChild, showIcons, showBranches)
+		renderStackNodeInSection(b, child, childPrefix, isLastChild, opts)
 	}
 }
 
@@ -203,6 +255,29 @@ func groupByRepo(prs []*models.PR) map[string][]*models.PR {
 func sortedRepoNames(byRepo map[string][]*models.PR) []string {
 	names := make([]string, 0, len(byRepo))
 	for name := range byRepo {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// groupByAuthor groups PRs by their author username.
+func groupByAuthor(prs []*models.PR) map[string][]*models.PR {
+	result := make(map[string][]*models.PR)
+	for _, pr := range prs {
+		author := pr.Author
+		if author == "" {
+			author = "unknown"
+		}
+		result[author] = append(result[author], pr)
+	}
+	return result
+}
+
+// sortedAuthorNames returns author names sorted alphabetically.
+func sortedAuthorNames(byAuthor map[string][]*models.PR) []string {
+	names := make([]string, 0, len(byAuthor))
+	for name := range byAuthor {
 		names = append(names, name)
 	}
 	sort.Strings(names)
