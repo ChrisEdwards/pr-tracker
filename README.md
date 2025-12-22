@@ -168,6 +168,27 @@ max_pr_age_days: 0           # Hide PRs older than N days (0 = no limit)
 | `show_other_prs` | `false` | Show "Other PRs" section |
 | `max_pr_age_days` | `0` | Hide PRs older than N days (0 = no limit) |
 
+### Environment Variables
+
+All configuration options can be set via environment variables with the `PRT_` prefix. Environment variables override config file values but are overridden by CLI flags.
+
+| Variable | Config Equivalent | Example |
+|----------|-------------------|---------|
+| `PRT_GITHUB_USERNAME` | `github_username` | `export PRT_GITHUB_USERNAME=jdoe` |
+| `PRT_SCAN_DEPTH` | `scan_depth` | `export PRT_SCAN_DEPTH=5` |
+| `PRT_DEFAULT_GROUP_BY` | `default_group_by` | `export PRT_DEFAULT_GROUP_BY=author` |
+| `PRT_DEFAULT_SORT` | `default_sort` | `export PRT_DEFAULT_SORT=newest` |
+| `PRT_SHOW_BRANCH_NAME` | `show_branch_name` | `export PRT_SHOW_BRANCH_NAME=false` |
+| `PRT_SHOW_ICONS` | `show_icons` | `export PRT_SHOW_ICONS=false` |
+| `PRT_SHOW_OTHER_PRS` | `show_other_prs` | `export PRT_SHOW_OTHER_PRS=true` |
+| `PRT_MAX_PR_AGE_DAYS` | `max_pr_age_days` | `export PRT_MAX_PR_AGE_DAYS=30` |
+
+**Configuration precedence** (highest to lowest):
+1. CLI flags (`--sort newest`)
+2. Environment variables (`PRT_DEFAULT_SORT=newest`)
+3. Config file (`~/.prt/config.yaml`)
+4. Built-in defaults
+
 ## Output Categories
 
 ### My PRs
