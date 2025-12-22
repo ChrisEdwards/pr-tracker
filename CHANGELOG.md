@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-22
+
+### Added
+
+- `--sort` flag to override default sort order (oldest/newest)
+- `--group-by author` flag to group PRs by author instead of repository
+- `prt config` subcommand for viewing and managing configuration
+- `--setup` flag to re-run the interactive setup wizard
+- Comprehensive CLI test suite
+- GitHub Actions CI workflow for PRs and main branch
+
+### Fixed
+
+- Data race in spinner during concurrent repo scanning
+- Sort order preservation when rendering stacks and non-stacked PRs
+- Stacked PR rendering in author grouping mode
+- Tree continuation lines for non-stacked PRs
+
+### Documentation
+
+- Document PRT_* environment variables for configuration
+- Add comprehensive JSON output schema to README
+
 ## [0.4.0] - 2025-12-22
 
 ### Added
@@ -58,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON output for scripting with jq
 - Interactive setup wizard on first run
 
-[Unreleased]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.1.0...v0.2.0
