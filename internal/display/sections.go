@@ -95,17 +95,44 @@ func renderByAuthor(b *strings.Builder, prs []*models.PR, stacks map[string]*mod
 }
 
 // renderPRsForAuthorGroup renders an author's PRs across multiple repos with proper stack relationships.
-// It sub-groups by repo to use stack information while maintaining correct tree line indices.
+// PRs are rendered in their input order (preserving sort), interleaving stacks and non-stacked PRs.
 func renderPRsForAuthorGroup(b *strings.Builder, prs []*models.PR, stacks map[string]*models.Stack, opts SectionOptions) {
-	byRepo := groupByRepo(prs)
-	repoNames := sortedRepoNames(byRepo)
+	// Build maps for stack membership and root lookup across all repos
+	stackRootNodes := make(map[string]map[int]*models.StackNode) // repoName -> PR number -> stack root node
+	stackChildPRs := make(map[string]map[int]bool)               // repoName -> PR numbers that are children
 
-	// First pass: count total top-level items across all repos
+	for repoName, stack := range stacks {
+		if stack == nil {
+			continue
+		}
+		stackRootNodes[repoName] = make(map[int]*models.StackNode)
+		stackChildPRs[repoName] = make(map[int]bool)
+
+		// Map each root PR number to its node
+		for _, root := range stack.Roots {
+			if root.PR != nil {
+				stackRootNodes[repoName][root.PR.Number] = root
+			}
+		}
+
+		// Identify all children (PRs in stacks that are NOT roots)
+		for _, node := range stack.AllNodes {
+			if node.PR != nil {
+				if _, isRoot := stackRootNodes[repoName][node.PR.Number]; !isRoot {
+					stackChildPRs[repoName][node.PR.Number] = true
+				}
+			}
+		}
+	}
+
+	// Count top-level items (roots + non-stacked PRs, excluding children)
 	totalItems := 0
-	for _, repoName := range repoNames {
-		repoPRs := byRepo[repoName]
-		stack := stacks[repoName]
-		totalItems += countTopLevelItems(repoPRs, stack)
+	for _, pr := range prs {
+		repoName := pr.RepoFullName()
+		if childSet, ok := stackChildPRs[repoName]; ok && childSet[pr.Number] {
+			continue
+		}
+		totalItems++
 	}
 
 	// Create base render options
@@ -115,68 +142,43 @@ func renderPRsForAuthorGroup(b *strings.Builder, prs []*models.PR, stacks map[st
 		ShowRepoInsteadOfAuthor: true,
 	}
 
-	// Second pass: render all repos with correct global indices
+	// Render PRs in input order, interleaving stacks and non-stacked PRs
 	itemIdx := 0
-	for _, repoName := range repoNames {
-		repoPRs := byRepo[repoName]
-		stack := stacks[repoName]
+	for _, pr := range prs {
+		repoName := pr.RepoFullName()
 
-		// Build a set of PR numbers that are part of a stack (for filtering)
-		stackedPRs := make(map[int]bool)
-		var stackRoots []*models.StackNode
+		// Skip children - they're rendered by their parent stack
+		if childSet, ok := stackChildPRs[repoName]; ok && childSet[pr.Number] {
+			continue
+		}
 
-		if stack != nil {
-			prNumberSet := make(map[int]bool)
-			for _, pr := range repoPRs {
-				prNumberSet[pr.Number] = true
-			}
+		isLast := itemIdx == totalItems-1
 
-			for _, node := range stack.AllNodes {
-				if node.PR != nil {
-					stackedPRs[node.PR.Number] = true
-				}
-			}
-
-			for _, root := range stack.Roots {
-				if root.PR != nil && prNumberSet[root.PR.Number] {
-					stackRoots = append(stackRoots, root)
-				}
+		// Check if this PR is a stack root in its repo
+		if repoRoots, ok := stackRootNodes[repoName]; ok {
+			if rootNode, isStackRoot := repoRoots[pr.Number]; isStackRoot {
+				// This PR is a stack root - render the entire stack tree
+				renderStackNodeInSection(b, rootNode, "", isLast, prOpts)
+				itemIdx++
+				continue
 			}
 		}
 
-		// Collect non-stacked PRs
-		var nonStackedPRs []*models.PR
-		for _, pr := range repoPRs {
-			if !stackedPRs[pr.Number] {
-				nonStackedPRs = append(nonStackedPRs, pr)
-			}
+		// Non-stacked PR - render as single item
+		prefix := TreeStyle.Render(TreeBranch) + " "
+		if isLast {
+			prefix = TreeStyle.Render(TreeLastBranch) + " "
 		}
 
-		// Render stack trees
-		for _, root := range stackRoots {
-			isLast := itemIdx == totalItems-1
-			renderStackNodeInSection(b, root, "", isLast, prOpts)
-			itemIdx++
+		var continuationPrefix string
+		if !isLast {
+			continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
+		} else {
+			continuationPrefix = TreeIndent
 		}
 
-		// Render non-stacked PRs
-		for _, pr := range nonStackedPRs {
-			isLast := itemIdx == totalItems-1
-			prefix := TreeStyle.Render(TreeBranch) + " "
-			if isLast {
-				prefix = TreeStyle.Render(TreeLastBranch) + " "
-			}
-
-			var continuationPrefix string
-			if !isLast {
-				continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
-			} else {
-				continuationPrefix = TreeIndent
-			}
-
-			b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
-			itemIdx++
-		}
+		b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
+		itemIdx++
 	}
 }
 
@@ -216,45 +218,38 @@ func countTopLevelItems(prs []*models.PR, stack *models.Stack) int {
 
 // renderPRsInSection renders a list of PRs within a section.
 // It uses stack tree structure for stacked PRs and flat rendering for non-stacked PRs.
+// PRs are rendered in their input order (preserving sort), interleaving stacks and non-stacked PRs.
 // When showRepoInsteadOfAuthor is true, the repo name is shown instead of author (for author grouping mode).
 func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stack, showIcons bool, showBranches bool, showRepoInsteadOfAuthor bool) {
-	// Build a set of PR numbers that are part of a stack (for filtering)
-	stackedPRs := make(map[int]bool)
-	var stackRoots []*models.StackNode
+	// Build maps for stack membership and root lookup
+	stackRootNodes := make(map[int]*models.StackNode) // PR number -> stack root node
+	stackChildPRs := make(map[int]bool)               // PR numbers that are children (not roots)
 
 	if stack != nil {
-		// Find PRs in our list that are stack roots
-		prNumberSet := make(map[int]bool)
-		for _, pr := range prs {
-			prNumberSet[pr.Number] = true
+		// Map each root PR number to its node
+		for _, root := range stack.Roots {
+			if root.PR != nil {
+				stackRootNodes[root.PR.Number] = root
+			}
 		}
 
-		// Collect all stacked PRs and identify roots in our PR list
+		// Identify all children (PRs in stacks that are NOT roots)
 		for _, node := range stack.AllNodes {
 			if node.PR != nil {
-				stackedPRs[node.PR.Number] = true
-			}
-		}
-
-		// Find roots that are in our PR list
-		for _, root := range stack.Roots {
-			if root.PR != nil && prNumberSet[root.PR.Number] {
-				stackRoots = append(stackRoots, root)
+				if _, isRoot := stackRootNodes[node.PR.Number]; !isRoot {
+					stackChildPRs[node.PR.Number] = true
+				}
 			}
 		}
 	}
 
-	// Collect non-stacked PRs (PRs not part of any stack)
-	var nonStackedPRs []*models.PR
+	// Count top-level items (roots + non-stacked PRs, excluding children)
+	totalItems := 0
 	for _, pr := range prs {
-		if !stackedPRs[pr.Number] {
-			nonStackedPRs = append(nonStackedPRs, pr)
+		if !stackChildPRs[pr.Number] {
+			totalItems++
 		}
 	}
-
-	// Calculate total items to render for determining last item
-	totalItems := len(stackRoots) + len(nonStackedPRs)
-	itemIdx := 0
 
 	// Create base render options
 	prOpts := PRRenderOptions{
@@ -263,31 +258,35 @@ func renderPRsInSection(b *strings.Builder, prs []*models.PR, stack *models.Stac
 		ShowRepoInsteadOfAuthor: showRepoInsteadOfAuthor,
 	}
 
-	// Render stack trees first (each root with its children)
-	for _, root := range stackRoots {
-		isLast := itemIdx == totalItems-1
-		renderStackNodeInSection(b, root, "", isLast, prOpts)
-		itemIdx++
-	}
-
-	// Render non-stacked PRs
-	for _, pr := range nonStackedPRs {
-		isLast := itemIdx == totalItems-1
-		prefix := TreeStyle.Render(TreeBranch) + " "
-		if isLast {
-			prefix = TreeStyle.Render(TreeLastBranch) + " "
+	// Render PRs in input order, interleaving stacks and non-stacked PRs
+	itemIdx := 0
+	for _, pr := range prs {
+		// Skip children - they're rendered by their parent stack
+		if stackChildPRs[pr.Number] {
+			continue
 		}
 
-		// Calculate continuation prefix for detail lines (status, branches, URL)
-		// Show vertical bar if there are more items below
-		var continuationPrefix string
-		if !isLast {
-			continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
+		isLast := itemIdx == totalItems-1
+
+		if rootNode, isStackRoot := stackRootNodes[pr.Number]; isStackRoot {
+			// This PR is a stack root - render the entire stack tree
+			renderStackNodeInSection(b, rootNode, "", isLast, prOpts)
 		} else {
-			continuationPrefix = TreeIndent
-		}
+			// Non-stacked PR - render as single item
+			prefix := TreeStyle.Render(TreeBranch) + " "
+			if isLast {
+				prefix = TreeStyle.Render(TreeLastBranch) + " "
+			}
 
-		b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
+			var continuationPrefix string
+			if !isLast {
+				continuationPrefix = TreeStyle.Render(TreeVertical) + "   "
+			} else {
+				continuationPrefix = TreeIndent
+			}
+
+			b.WriteString(RenderPRWithContinuation(pr, prefix, continuationPrefix, prOpts))
+		}
 		itemIdx++
 	}
 }
