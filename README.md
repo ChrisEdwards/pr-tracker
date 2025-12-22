@@ -86,7 +86,7 @@ prt -f "api-*"
 prt -s newest
 
 # Output as JSON for scripting
-prt --json | jq '.needsMyAttention | length'
+prt --json | jq '.needs_my_attention | length'
 
 # Disable colors (for piping)
 prt --no-color > prs.txt
@@ -204,10 +204,10 @@ Use `--json` for scripting:
 
 ```bash
 # Count PRs needing your attention
-prt --json | jq '.needsMyAttention | length'
+prt --json | jq '.needs_my_attention | length'
 
 # List all PR URLs
-prt --json | jq '.myPRs[].url'
+prt --json | jq '.my_prs[].url'
 
 # Export to file
 prt --json > ~/pr-snapshot.json
