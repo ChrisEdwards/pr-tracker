@@ -55,6 +55,9 @@ func init() {
 	rootCmd.Flags().IntVar(&flagMaxAge, "max-age", 0, "Hide PRs older than N days (0 uses config default)")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON")
 	rootCmd.Flags().BoolVar(&flagNoColor, "no-color", false, "Disable colored output")
+
+	// Add subcommands
+	rootCmd.AddCommand(configCmd)
 }
 
 // Execute runs the CLI with the given version string.
