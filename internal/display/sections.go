@@ -420,4 +420,3 @@ func RenderEmptySection(title string, icon string, showIcons bool) string {
 	b.WriteString("\n")
 	return b.String()
 }
-

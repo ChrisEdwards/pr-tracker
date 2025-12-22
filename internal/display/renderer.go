@@ -10,9 +10,9 @@ import (
 
 // PRRenderOptions configures how a single PR is rendered.
 type PRRenderOptions struct {
-	ShowIcons              bool
-	ShowBranches           bool
-	IsBlocked              bool
+	ShowIcons               bool
+	ShowBranches            bool
+	IsBlocked               bool
 	ShowRepoInsteadOfAuthor bool // When true, show [repo] instead of @author (for author grouping mode)
 }
 

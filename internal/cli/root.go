@@ -44,6 +44,7 @@ shows stacked PR relationships.`,
 	flagMaxAge  int
 	flagJSON    bool
 	flagNoColor bool
+	flagSetup   bool
 )
 
 func init() {
@@ -55,6 +56,7 @@ func init() {
 	rootCmd.Flags().IntVar(&flagMaxAge, "max-age", 0, "Hide PRs older than N days (0 uses config default)")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON")
 	rootCmd.Flags().BoolVar(&flagNoColor, "no-color", false, "Disable colored output")
+	rootCmd.Flags().BoolVar(&flagSetup, "setup", false, "Re-run the setup wizard")
 
 	// Add subcommands
 	rootCmd.AddCommand(configCmd)
@@ -94,8 +96,8 @@ func runPRT(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// 2. Check if setup needed
-	if config.NeedsSetup(cfg) {
+	// 2. Check if setup needed (or --setup flag used)
+	if flagSetup || config.NeedsSetup(cfg) {
 		return runWizard(cfg)
 	}
 
