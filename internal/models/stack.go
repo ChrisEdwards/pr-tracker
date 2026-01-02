@@ -23,8 +23,8 @@ type Stack struct {
 	// Root nodes (PRs with no parent in the set)
 	Roots []*StackNode `json:"roots"`
 
-	// All nodes flattened for easy iteration
-	AllNodes []*StackNode `json:"all_nodes"`
+	// All nodes flattened for easy iteration (excluded from JSON to avoid cycles)
+	AllNodes []*StackNode `json:"-"`
 }
 
 // IsBlocked returns true if this PR has an unmerged parent PR.
