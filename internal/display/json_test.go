@@ -14,7 +14,7 @@ func TestRenderJSON_EmptyResult(t *testing.T) {
 	result := models.NewScanResult()
 	result.Username = "testuser"
 
-	output, err := RenderJSON(result)
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestRenderJSON_WithPRs(t *testing.T) {
 	result.MyPRs = append(result.MyPRs, pr1)
 	result.NeedsMyAttention = append(result.NeedsMyAttention, pr2)
 
-	output, err := RenderJSON(result)
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRenderJSON_WithPRs(t *testing.T) {
 }
 
 func TestRenderJSON_NilResult(t *testing.T) {
-	_, err := RenderJSON(nil)
+	_, err := RenderJSON(nil, JSONOptions{})
 	if err == nil {
 		t.Error("Expected error for nil result")
 	}
@@ -116,7 +116,7 @@ func TestRenderJSON_IsPrettyPrinted(t *testing.T) {
 	result := models.NewScanResult()
 	result.Username = "test"
 
-	output, err := RenderJSON(result)
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestRenderJSON_AllFieldsPresent(t *testing.T) {
 	result.ReposWithoutPRs = append(result.ReposWithoutPRs, &models.Repository{Name: "repo2"})
 	result.ReposWithErrors = append(result.ReposWithErrors, &models.Repository{Name: "repo3"})
 
-	output, err := RenderJSON(result)
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestRenderJSON_WorksWithJQ(t *testing.T) {
 	}
 	result.MyPRs = append(result.MyPRs, pr)
 
-	output, err := RenderJSON(result)
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
@@ -289,5 +289,49 @@ func TestRenderJSON_WorksWithJQ(t *testing.T) {
 
 	if url, ok := firstPR["url"].(string); !ok || url != "https://github.com/test/repo/pull/42" {
 		t.Errorf("Expected URL, got %v", firstPR["url"])
+	}
+}
+
+func TestRenderJSON_ShowOtherPRs_True(t *testing.T) {
+	result := models.NewScanResult()
+	result.Username = "test"
+	result.OtherPRs = []*models.PR{
+		{Number: 100, Title: "Bot PR", Author: "dependabot"},
+	}
+
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
+	if err != nil {
+		t.Fatalf("RenderJSON failed: %v", err)
+	}
+
+	var parsed models.ScanResult
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Fatalf("Invalid JSON: %v", err)
+	}
+
+	if len(parsed.OtherPRs) != 1 {
+		t.Errorf("Expected 1 OtherPR with ShowOtherPRs=true, got %d", len(parsed.OtherPRs))
+	}
+}
+
+func TestRenderJSON_ShowOtherPRs_False(t *testing.T) {
+	result := models.NewScanResult()
+	result.Username = "test"
+	result.OtherPRs = []*models.PR{
+		{Number: 100, Title: "Bot PR", Author: "dependabot"},
+	}
+
+	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: false})
+	if err != nil {
+		t.Fatalf("RenderJSON failed: %v", err)
+	}
+
+	var parsed models.ScanResult
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Fatalf("Invalid JSON: %v", err)
+	}
+
+	if len(parsed.OtherPRs) != 0 {
+		t.Errorf("Expected 0 OtherPRs with ShowOtherPRs=false, got %d", len(parsed.OtherPRs))
 	}
 }

@@ -243,7 +243,9 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 
 	// Handle JSON mode
 	if opts.JSON {
-		return RenderJSON(result)
+		return RenderJSON(result, JSONOptions{
+			ShowOtherPRs: opts.ShowOtherPRs,
+		})
 	}
 
 	// Handle no-color mode
