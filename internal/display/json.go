@@ -39,7 +39,7 @@ func RenderJSON(result *models.ScanResult, opts JSONOptions) (string, error) {
 		return "", fmt.Errorf("failed to marshal result: %w", err)
 	}
 
-	return string(data), nil
+	return string(data) + "\n", nil
 }
 
 // applyJSONFilters creates a filtered copy of the result based on options.
