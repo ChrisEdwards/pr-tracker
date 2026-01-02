@@ -53,33 +53,11 @@ func applyJSONFilters(result *models.ScanResult, opts JSONOptions) *models.ScanR
 		filtered.OtherPRs = nil
 	}
 
-	// Build set of repos that have PRs in displayed categories
-	displayedRepos := make(map[string]bool)
-	for _, pr := range filtered.MyPRs {
-		displayedRepos[pr.RepoPath] = true
-	}
-	for _, pr := range filtered.NeedsMyAttention {
-		displayedRepos[pr.RepoPath] = true
-	}
-	for _, pr := range filtered.TeamPRs {
-		displayedRepos[pr.RepoPath] = true
-	}
-	if opts.ShowOtherPRs {
-		for _, pr := range filtered.OtherPRs {
-			displayedRepos[pr.RepoPath] = true
-		}
-	}
+	// Clear stacks - they duplicate PR data and are only used for tree rendering
+	filtered.Stacks = nil
 
-	// Filter repos_with_prs to only include repos with displayed PRs
-	var filteredRepos []*models.Repository
-	for _, repo := range filtered.ReposWithPRs {
-		if displayedRepos[repo.Path] {
-			filteredRepos = append(filteredRepos, repo)
-		}
-	}
-	filtered.ReposWithPRs = filteredRepos
-
-	// Clear repos_without_prs and repos_with_errors - CLI doesn't show these
+	// Clear repo lists - CLI doesn't show these, just the PRs
+	filtered.ReposWithPRs = nil
 	filtered.ReposWithoutPRs = nil
 	filtered.ReposWithErrors = nil
 
