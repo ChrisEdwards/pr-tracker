@@ -20,19 +20,19 @@ func TestRenderJSON_EmptyResult(t *testing.T) {
 	}
 
 	// Verify it's valid JSON
-	var parsed map[string]interface{}
+	var parsed struct {
+		Username string `json:"username"`
+		TotalPRs int    `json:"total_prs"`
+	}
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("Output is not valid JSON: %v", err)
 	}
 
-	// Check key fields exist
-	if parsed["username"] != "testuser" {
-		t.Errorf("Expected username 'testuser', got %v", parsed["username"])
+	if parsed.Username != "testuser" {
+		t.Errorf("Expected username 'testuser', got %v", parsed.Username)
 	}
-
-	// Check total_prs is 0
-	if parsed["total_prs"].(float64) != 0 {
-		t.Errorf("Expected total_prs=0, got %v", parsed["total_prs"])
+	if parsed.TotalPRs != 0 {
+		t.Errorf("Expected total_prs=0, got %d", parsed.TotalPRs)
 	}
 }
 
@@ -240,10 +240,12 @@ func TestRenderJSON_AllFieldsPresent(t *testing.T) {
 	}
 
 	// Verify total_prs count is correct
-	var parsed map[string]interface{}
-	json.Unmarshal([]byte(output), &parsed)
-	if parsed["total_prs"].(float64) != 4 {
-		t.Errorf("Expected total_prs=4, got %v", parsed["total_prs"])
+	var count struct {
+		TotalPRs int `json:"total_prs"`
+	}
+	json.Unmarshal([]byte(output), &count)
+	if count.TotalPRs != 4 {
+		t.Errorf("Expected total_prs=4, got %d", count.TotalPRs)
 	}
 }
 
