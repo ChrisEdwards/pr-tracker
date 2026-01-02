@@ -43,6 +43,7 @@ func RenderJSON(result *models.ScanResult, opts JSONOptions) (string, error) {
 }
 
 // applyJSONFilters creates a filtered copy of the result based on options.
+// This ensures JSON output matches what the CLI displays.
 func applyJSONFilters(result *models.ScanResult, opts JSONOptions) *models.ScanResult {
 	// Create a shallow copy
 	filtered := *result
@@ -51,6 +52,36 @@ func applyJSONFilters(result *models.ScanResult, opts JSONOptions) *models.ScanR
 	if !opts.ShowOtherPRs {
 		filtered.OtherPRs = nil
 	}
+
+	// Build set of repos that have PRs in displayed categories
+	displayedRepos := make(map[string]bool)
+	for _, pr := range filtered.MyPRs {
+		displayedRepos[pr.RepoPath] = true
+	}
+	for _, pr := range filtered.NeedsMyAttention {
+		displayedRepos[pr.RepoPath] = true
+	}
+	for _, pr := range filtered.TeamPRs {
+		displayedRepos[pr.RepoPath] = true
+	}
+	if opts.ShowOtherPRs {
+		for _, pr := range filtered.OtherPRs {
+			displayedRepos[pr.RepoPath] = true
+		}
+	}
+
+	// Filter repos_with_prs to only include repos with displayed PRs
+	var filteredRepos []*models.Repository
+	for _, repo := range filtered.ReposWithPRs {
+		if displayedRepos[repo.Path] {
+			filteredRepos = append(filteredRepos, repo)
+		}
+	}
+	filtered.ReposWithPRs = filteredRepos
+
+	// Clear repos_without_prs and repos_with_errors - CLI doesn't show these
+	filtered.ReposWithoutPRs = nil
+	filtered.ReposWithErrors = nil
 
 	return &filtered
 }
