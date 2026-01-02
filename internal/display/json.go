@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"prt/internal/models"
 )
@@ -14,6 +15,20 @@ type JSONOptions struct {
 	ShowOtherPRs bool // Include "Other PRs" section
 }
 
+// jsonOutput is the clean structure for JSON output.
+// Only includes fields useful for scripting.
+type jsonOutput struct {
+	MyPRs            []*models.PR `json:"my_prs,omitempty"`
+	NeedsMyAttention []*models.PR `json:"needs_my_attention,omitempty"`
+	TeamPRs          []*models.PR `json:"team_prs,omitempty"`
+	OtherPRs         []*models.PR `json:"other_prs,omitempty"`
+
+	// Summary counts
+	TotalPRs    int    `json:"total_prs"`
+	Username    string `json:"username"`
+	ScanSeconds float64 `json:"scan_seconds"`
+}
+
 // RenderJSON marshals the ScanResult to pretty-printed JSON.
 // The output is suitable for scripting with tools like jq.
 //
@@ -21,20 +36,16 @@ type JSONOptions struct {
 //
 //	prt --json | jq '.my_prs | length'
 //	prt --json | jq '.needs_my_attention[].url'
-//	prt --json > ~/pr-snapshot.json
-//
-// Note: scan_duration_ns is in nanoseconds. Convert to seconds:
-//
-//	jq '.scan_duration_ns / 1000000000'
+//	prt --json | jq '.total_prs'
 func RenderJSON(result *models.ScanResult, opts JSONOptions) (string, error) {
 	if result == nil {
 		return "", fmt.Errorf("cannot render nil result")
 	}
 
-	// Apply filters to match CLI output
-	filtered := applyJSONFilters(result, opts)
+	// Build clean output structure
+	output := buildJSONOutput(result, opts)
 
-	data, err := json.MarshalIndent(filtered, "", "  ")
+	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal result: %w", err)
 	}
@@ -42,26 +53,27 @@ func RenderJSON(result *models.ScanResult, opts JSONOptions) (string, error) {
 	return string(data) + "\n", nil
 }
 
-// applyJSONFilters creates a filtered copy of the result based on options.
-// This ensures JSON output matches what the CLI displays.
-func applyJSONFilters(result *models.ScanResult, opts JSONOptions) *models.ScanResult {
-	// Create a shallow copy
-	filtered := *result
-
-	// Clear OtherPRs if not showing them
-	if !opts.ShowOtherPRs {
-		filtered.OtherPRs = nil
+// buildJSONOutput creates a clean JSON structure from ScanResult.
+func buildJSONOutput(result *models.ScanResult, opts JSONOptions) *jsonOutput {
+	output := &jsonOutput{
+		MyPRs:            result.MyPRs,
+		NeedsMyAttention: result.NeedsMyAttention,
+		TeamPRs:          result.TeamPRs,
+		Username:         result.Username,
+		ScanSeconds:      float64(result.ScanDuration) / float64(time.Second),
 	}
 
-	// Clear stacks - they duplicate PR data and are only used for tree rendering
-	filtered.Stacks = nil
+	if opts.ShowOtherPRs {
+		output.OtherPRs = result.OtherPRs
+	}
 
-	// Clear repo lists - CLI doesn't show these, just the PRs
-	filtered.ReposWithPRs = nil
-	filtered.ReposWithoutPRs = nil
-	filtered.ReposWithErrors = nil
+	// Count actual PRs returned
+	output.TotalPRs = len(output.MyPRs) + len(output.NeedsMyAttention) + len(output.TeamPRs)
+	if opts.ShowOtherPRs {
+		output.TotalPRs += len(output.OtherPRs)
+	}
 
-	return &filtered
+	return output
 }
 
 // WriteJSON writes the ScanResult as pretty-printed JSON to the given writer.

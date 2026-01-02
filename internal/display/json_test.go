@@ -30,9 +30,9 @@ func TestRenderJSON_EmptyResult(t *testing.T) {
 		t.Errorf("Expected username 'testuser', got %v", parsed["username"])
 	}
 
-	// Check arrays are empty but present
-	if myPRs, ok := parsed["my_prs"].([]interface{}); !ok || len(myPRs) != 0 {
-		t.Error("Expected empty my_prs array")
+	// Check total_prs is 0
+	if parsed["total_prs"].(float64) != 0 {
+		t.Errorf("Expected total_prs=0, got %v", parsed["total_prs"])
 	}
 }
 
@@ -78,8 +78,14 @@ func TestRenderJSON_WithPRs(t *testing.T) {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
 
-	// Verify it's valid JSON
-	var parsed models.ScanResult
+	// Verify it's valid JSON with new structure
+	var parsed struct {
+		MyPRs            []*models.PR `json:"my_prs"`
+		NeedsMyAttention []*models.PR `json:"needs_my_attention"`
+		TotalPRs         int          `json:"total_prs"`
+		Username         string       `json:"username"`
+		ScanSeconds      float64      `json:"scan_seconds"`
+	}
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("Output is not valid JSON: %v", err)
 	}
@@ -94,11 +100,11 @@ func TestRenderJSON_WithPRs(t *testing.T) {
 	if len(parsed.NeedsMyAttention) != 1 {
 		t.Errorf("Expected 1 PR in NeedsMyAttention, got %d", len(parsed.NeedsMyAttention))
 	}
-	if parsed.TotalReposScanned != 2 {
-		t.Errorf("Expected TotalReposScanned=2, got %d", parsed.TotalReposScanned)
+	if parsed.TotalPRs != 2 {
+		t.Errorf("Expected TotalPRs=2, got %d", parsed.TotalPRs)
 	}
-	if parsed.ScanDuration != 2300*time.Millisecond {
-		t.Errorf("Expected ScanDuration=2300ms, got %v", parsed.ScanDuration)
+	if parsed.ScanSeconds < 2.0 || parsed.ScanSeconds > 3.0 {
+		t.Errorf("Expected ScanSeconds ~2.3, got %v", parsed.ScanSeconds)
 	}
 }
 
@@ -198,8 +204,6 @@ func TestRenderJSONCompact_NilResult(t *testing.T) {
 func TestRenderJSON_AllFieldsPresent(t *testing.T) {
 	result := models.NewScanResult()
 	result.Username = "complete-test"
-	result.TotalReposScanned = 5
-	result.TotalPRsFound = 12
 	result.ScanDuration = 1500 * time.Millisecond
 
 	// Add PRs to all categories
@@ -213,36 +217,33 @@ func TestRenderJSON_AllFieldsPresent(t *testing.T) {
 	result.TeamPRs = append(result.TeamPRs, teamPR)
 	result.OtherPRs = append(result.OtherPRs, otherPR)
 
-	// Add repos
-	result.ReposWithPRs = append(result.ReposWithPRs, &models.Repository{Name: "repo1"})
-	result.ReposWithoutPRs = append(result.ReposWithoutPRs, &models.Repository{Name: "repo2"})
-	result.ReposWithErrors = append(result.ReposWithErrors, &models.Repository{Name: "repo3"})
-
 	output, err := RenderJSON(result, JSONOptions{ShowOtherPRs: true})
 	if err != nil {
 		t.Fatalf("RenderJSON failed: %v", err)
 	}
 
-	// Verify all top-level fields are present
+	// Verify all top-level fields are present in clean output
 	requiredFields := []string{
 		"my_prs",
 		"needs_my_attention",
 		"team_prs",
 		"other_prs",
-		"repos_with_prs",
-		"repos_without_prs",
-		"repos_with_errors",
-		"stacks",
-		"total_repos_scanned",
-		"total_prs_found",
-		"scan_duration_ns",
+		"total_prs",
 		"username",
+		"scan_seconds",
 	}
 
 	for _, field := range requiredFields {
 		if !strings.Contains(output, `"`+field+`"`) {
 			t.Errorf("Expected field %q in JSON output", field)
 		}
+	}
+
+	// Verify total_prs count is correct
+	var parsed map[string]interface{}
+	json.Unmarshal([]byte(output), &parsed)
+	if parsed["total_prs"].(float64) != 4 {
+		t.Errorf("Expected total_prs=4, got %v", parsed["total_prs"])
 	}
 }
 
