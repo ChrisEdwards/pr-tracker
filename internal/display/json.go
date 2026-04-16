@@ -24,8 +24,8 @@ type jsonOutput struct {
 	OtherPRs         []*models.PR `json:"other_prs,omitempty"`
 
 	// Summary counts
-	TotalPRs    int    `json:"total_prs"`
-	Username    string `json:"username"`
+	TotalPRs    int     `json:"total_prs"`
+	Username    string  `json:"username"`
 	ScanSeconds float64 `json:"scan_seconds"`
 }
 
