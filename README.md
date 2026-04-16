@@ -324,8 +324,8 @@ Check that:
 Contributions welcome! Please:
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run tests: `make test`
+3. Run `make setup` to install the pre-commit hook (formats, vets, builds, and tests before every commit)
+4. Make your changes
 5. Submit a pull request
 
 ## Releasing

@@ -8,7 +8,7 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION)"
 BIN_DIR = bin
 BINARY = $(BIN_DIR)/prt
 
-.PHONY: build test test-coverage clean install release release-snapshot lint fmt help
+.PHONY: build test test-coverage clean install release release-snapshot lint fmt setup help
 
 ## build: Build binary to bin/prt
 build:
@@ -48,6 +48,11 @@ lint:
 ## fmt: Format Go code
 fmt:
 	go fmt ./...
+
+## setup: Install git hooks (run once after cloning)
+setup:
+	git config core.hooksPath .githooks
+	@echo "Git hooks installed from .githooks/"
 
 ## help: Show this help
 help:

@@ -1,0 +1,42 @@
+#!/bin/sh
+# Pre-commit hook: Go quality gates
+#
+# Install via: make setup
+
+# --- Go quality gates (mirrors CI) ---
+
+# Ensure go.mod/go.sum are tidy
+go mod tidy
+if ! git diff --exit-code go.mod go.sum >/dev/null 2>&1; then
+    echo "go mod tidy made changes — staging them" >&2
+    git add go.mod go.sum
+fi
+
+# Auto-fix formatting and re-stage any changed files
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+    echo "Fixing formatting:" >&2
+    echo "$UNFORMATTED" >&2
+    gofmt -w .
+    echo "$UNFORMATTED" | xargs git add
+fi
+
+echo "Running go vet..." >&2
+if ! go vet ./...; then
+    echo "go vet failed" >&2
+    exit 1
+fi
+
+echo "Running go build..." >&2
+if ! go build ./...; then
+    echo "go build failed" >&2
+    exit 1
+fi
+
+echo "Running tests..." >&2
+if ! go test -race ./...; then
+    echo "tests failed" >&2
+    exit 1
+fi
+
+exit 0

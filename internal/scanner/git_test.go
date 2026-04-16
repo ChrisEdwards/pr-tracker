@@ -171,13 +171,15 @@ func TestGetRemoteURL(t *testing.T) {
 			t.Fatalf("Failed to add remote: %v", err)
 		}
 
-		// Test GetRemoteURL
+		// Test GetRemoteURL — only verify it parses to the expected owner/repo,
+		// not the exact URL string (git may rewrite SSH→HTTPS via url.insteadOf).
 		got, err := GetRemoteURL(tmpDir)
 		if err != nil {
 			t.Errorf("GetRemoteURL() error = %v, want nil", err)
 		}
-		if got != testURL {
-			t.Errorf("GetRemoteURL() = %q, want %q", got, testURL)
+		owner, repo := ParseGitHubRemote(got)
+		if owner != "testowner" || repo != "testrepo" {
+			t.Errorf("GetRemoteURL() = %q, parsed owner=%q repo=%q, want testowner/testrepo", got, owner, repo)
 		}
 	})
 
@@ -260,8 +262,11 @@ func TestInspectRepo(t *testing.T) {
 		if repo.Owner != "myorg" {
 			t.Errorf("InspectRepo() Owner = %q, want %q", repo.Owner, "myorg")
 		}
-		if repo.RemoteURL != testURL {
-			t.Errorf("InspectRepo() RemoteURL = %q, want %q", repo.RemoteURL, testURL)
+		// RemoteURL may differ from testURL if git rewrites SSH→HTTPS via url.insteadOf;
+		// verify it still resolves to the expected owner/repo instead.
+		o, r := ParseGitHubRemote(repo.RemoteURL)
+		if o != "myorg" || r != "myrepo" {
+			t.Errorf("InspectRepo() RemoteURL = %q, parsed owner=%q repo=%q, want myorg/myrepo", repo.RemoteURL, o, r)
 		}
 		if repo.Path != tmpDir {
 			t.Errorf("InspectRepo() Path = %q, want %q", repo.Path, tmpDir)
