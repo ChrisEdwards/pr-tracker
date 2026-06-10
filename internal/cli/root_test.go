@@ -89,17 +89,17 @@ func TestHelpFlag(t *testing.T) {
 		"PRT - GitHub PR Tracker",
 		"--path",
 		"--filter",
-		"--author=",
-		"--draft=",
-		"--bot=",
-		"--review-decision=",
+		"--author string",
+		"--draft string",
+		"--bot string",
+		"--review-decision string",
 		"--view",
 		"--json",
 		"--setup",
 		"--no-color",
-		"prt --author=team --draft=false --bot=false --review-decision=not-approved",
-		"prt --view=review-needed",
-		"--author=team excludes your own PRs",
+		"prt --author team --draft false --bot false --review-decision not-approved",
+		"prt --view review-needed",
+		"--author team excludes your own PRs",
 	}
 
 	for _, phrase := range expectedPhrases {
@@ -117,9 +117,9 @@ func TestREADME_DocumentsReviewNeededViewWorkflow(t *testing.T) {
 	content := string(readme)
 
 	expectedPhrases := []string{
-		"prt --author=team --draft=false --bot=false --review-decision=not-approved",
-		"prt --view=review-needed",
-		"prt --view=review-needed --author=@alice",
+		"prt --author team --draft false --bot false --review-decision not-approved",
+		"prt --view review-needed",
+		"prt --view review-needed --author @alice",
 		"External PRs do not match `review-needed` merely because they request your review",
 	}
 

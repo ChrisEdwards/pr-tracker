@@ -35,17 +35,17 @@ local repositories. Highlights PRs requiring your attention and
 shows stacked PR relationships.
 
 PR filters narrow the Matching PRs section while My PRs remain visible:
-  --author=me|team|other|@username
-  --draft=true|false
-  --bot=true|false
-  --review-decision=approved|not-approved|review-required|changes-requested|none
-  --view=<name>
+  --author me|team|other|@username
+  --draft true|false
+  --bot true|false
+  --review-decision approved|not-approved|review-required|changes-requested|none
+  --view <name>
 
 Common review-needed workflow:
-  prt --author=team --draft=false --bot=false --review-decision=not-approved
-  prt --view=review-needed
+  prt --author team --draft false --bot false --review-decision not-approved
+  prt --view review-needed
 
-Note: --author=team excludes your own PRs because My PRs are shown separately.`,
+Note: --author team excludes your own PRs because My PRs are shown separately.`,
 		RunE:          runPRT,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -71,11 +71,11 @@ Note: --author=team excludes your own PRs because My PRs are shown separately.`,
 func init() {
 	rootCmd.Flags().StringVarP(&flagPath, "path", "p", "", "Search path (overrides config)")
 	rootCmd.Flags().StringVarP(&flagFilter, "filter", "f", "", "Filter repos by name pattern (glob)")
-	rootCmd.Flags().StringVar(&flagAuthor, "author", "", "Filter Matching PRs by author: --author=me|team|other|@username")
-	rootCmd.Flags().StringVar(&flagDraft, "draft", "", "Filter Matching PRs by draft status: --draft=true|false")
-	rootCmd.Flags().StringVar(&flagBot, "bot", "", "Filter Matching PRs by Bot Author status: --bot=true|false")
-	rootCmd.Flags().StringVar(&flagReviewDecision, "review-decision", "", "Filter Matching PRs by Review Decision: --review-decision=approved|not-approved|review-required|changes-requested|none")
-	rootCmd.Flags().StringVar(&flagView, "view", "", "Apply a named View to Matching PRs; use --view=review-needed for ready team PRs without approval")
+	rootCmd.Flags().StringVar(&flagAuthor, "author", "", "Filter Matching PRs by author: me, team, other, or @username")
+	rootCmd.Flags().StringVar(&flagDraft, "draft", "", "Filter Matching PRs by draft status: true or false")
+	rootCmd.Flags().StringVar(&flagBot, "bot", "", "Filter Matching PRs by Bot Author status: true or false")
+	rootCmd.Flags().StringVar(&flagReviewDecision, "review-decision", "", "Filter Matching PRs by Review Decision: approved, not-approved, review-required, changes-requested, or none")
+	rootCmd.Flags().StringVar(&flagView, "view", "", "Apply a named View to Matching PRs; use --view review-needed for ready team PRs without approval")
 	rootCmd.Flags().StringVarP(&flagGroup, "group", "g", "", "Group by: project, author")
 	rootCmd.Flags().StringVarP(&flagSort, "sort", "s", "", "Sort by: oldest, newest")
 	rootCmd.Flags().IntVarP(&flagDepth, "depth", "d", 0, "Scan depth (0 uses config default)")
