@@ -12,16 +12,18 @@ import (
 
 // JSONOptions controls what is included in JSON output.
 type JSONOptions struct {
-	ShowOtherPRs bool // Include "Other PRs" section
+	ShowOtherPRs    bool // Include "Other PRs" section
+	ShowMatchingPRs bool // Include "Matching PRs" instead of category sections
 }
 
 // jsonOutput is the clean structure for JSON output.
 // Only includes fields useful for scripting.
 type jsonOutput struct {
-	MyPRs            []*models.PR `json:"my_prs,omitempty"`
-	NeedsMyAttention []*models.PR `json:"needs_my_attention,omitempty"`
-	TeamPRs          []*models.PR `json:"team_prs,omitempty"`
-	OtherPRs         []*models.PR `json:"other_prs,omitempty"`
+	MyPRs            []*models.PR  `json:"my_prs,omitempty"`
+	NeedsMyAttention []*models.PR  `json:"needs_my_attention,omitempty"`
+	TeamPRs          []*models.PR  `json:"team_prs,omitempty"`
+	OtherPRs         []*models.PR  `json:"other_prs,omitempty"`
+	MatchingPRs      *[]*models.PR `json:"matching_prs,omitempty"`
 
 	// Summary counts
 	TotalPRs    int     `json:"total_prs"`
@@ -56,12 +58,21 @@ func RenderJSON(result *models.ScanResult, opts JSONOptions) (string, error) {
 // buildJSONOutput creates a clean JSON structure from ScanResult.
 func buildJSONOutput(result *models.ScanResult, opts JSONOptions) *jsonOutput {
 	output := &jsonOutput{
-		MyPRs:            result.MyPRs,
-		NeedsMyAttention: result.NeedsMyAttention,
-		TeamPRs:          result.TeamPRs,
-		Username:         result.Username,
-		ScanSeconds:      float64(result.ScanDuration) / float64(time.Second),
+		MyPRs:       result.MyPRs,
+		Username:    result.Username,
+		ScanSeconds: float64(result.ScanDuration) / float64(time.Second),
 	}
+
+	if opts.ShowMatchingPRs {
+		matchingPRs := result.MatchingPRs
+		output.MatchingPRs = &matchingPRs
+		output.TotalPRs = len(output.MyPRs) + len(matchingPRs)
+
+		return output
+	}
+
+	output.NeedsMyAttention = result.NeedsMyAttention
+	output.TeamPRs = result.TeamPRs
 
 	if opts.ShowOtherPRs {
 		output.OtherPRs = result.OtherPRs

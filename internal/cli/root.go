@@ -4,6 +4,8 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"prt/internal/display"
 	"prt/internal/github"
 	"prt/internal/models"
+	"prt/internal/prfilters"
 	"prt/internal/scanner"
 
 	"github.com/spf13/cobra"
@@ -29,27 +32,50 @@ var (
 
 Aggregate and visualize GitHub Pull Request status across multiple
 local repositories. Highlights PRs requiring your attention and
-shows stacked PR relationships.`,
+shows stacked PR relationships.
+
+PR filters narrow the Matching PRs section while My PRs remain visible:
+  --author=me|team|other|@username
+  --draft=true|false
+  --bot=true|false
+  --review-decision=approved|not-approved|review-required|changes-requested|none
+  --view=<name>
+
+Common review-needed workflow:
+  prt --author=team --draft=false --bot=false --review-decision=not-approved
+  prt --view=review-needed
+
+Note: --author=team excludes your own PRs because My PRs are shown separately.`,
 		RunE:          runPRT,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
 	// Flags
-	flagPath    string
-	flagFilter  string
-	flagGroup   string
-	flagSort    string
-	flagDepth   int
-	flagMaxAge  int
-	flagJSON    bool
-	flagNoColor bool
-	flagSetup   bool
+	flagPath           string
+	flagFilter         string
+	flagAuthor         string
+	flagDraft          string
+	flagBot            string
+	flagReviewDecision string
+	flagView           string
+	flagGroup          string
+	flagSort           string
+	flagDepth          int
+	flagMaxAge         int
+	flagJSON           bool
+	flagNoColor        bool
+	flagSetup          bool
 )
 
 func init() {
 	rootCmd.Flags().StringVarP(&flagPath, "path", "p", "", "Search path (overrides config)")
 	rootCmd.Flags().StringVarP(&flagFilter, "filter", "f", "", "Filter repos by name pattern (glob)")
+	rootCmd.Flags().StringVar(&flagAuthor, "author", "", "Filter Matching PRs by author: --author=me|team|other|@username")
+	rootCmd.Flags().StringVar(&flagDraft, "draft", "", "Filter Matching PRs by draft status: --draft=true|false")
+	rootCmd.Flags().StringVar(&flagBot, "bot", "", "Filter Matching PRs by Bot Author status: --bot=true|false")
+	rootCmd.Flags().StringVar(&flagReviewDecision, "review-decision", "", "Filter Matching PRs by Review Decision: --review-decision=approved|not-approved|review-required|changes-requested|none")
+	rootCmd.Flags().StringVar(&flagView, "view", "", "Apply a named View to Matching PRs; use --view=review-needed for ready team PRs without approval")
 	rootCmd.Flags().StringVarP(&flagGroup, "group", "g", "", "Group by: project, author")
 	rootCmd.Flags().StringVarP(&flagSort, "sort", "s", "", "Sort by: oldest, newest")
 	rootCmd.Flags().IntVarP(&flagDepth, "depth", "d", 0, "Scan depth (0 uses config default)")
@@ -95,6 +121,10 @@ func runPRT(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
+	cliFilterSet, err := prfilters.ParseFlags(flagAuthor, flagDraft, flagBot, flagReviewDecision)
+	if err != nil {
+		return fmt.Errorf("filter error: %w", err)
+	}
 
 	// 2. Check if setup needed (or --setup flag used)
 	if flagSetup || config.NeedsSetup(cfg) {
@@ -104,6 +134,10 @@ func runPRT(cmd *cobra.Command, args []string) error {
 	// 3. Validate config
 	if err := cfg.Validate(); err != nil {
 		return err
+	}
+	prFilterSet, err := buildActiveFilterSet(cfg, flagView, cliFilterSet)
+	if err != nil {
+		return fmt.Errorf("filter error: %w", err)
 	}
 
 	// 4. Create scanner early (needed for parallel scan)
@@ -219,16 +253,20 @@ func runPRT(cmd *cobra.Command, args []string) error {
 	// 8. Categorize
 	cat := categorizer.NewCategorizer()
 	result := cat.Categorize(repos, cfg, cfg.GitHubUsername)
+	if prFilterSet.Active() {
+		result = prFilterSet.Apply(result, cfg)
+	}
 	result.ScanDuration = time.Since(startTime)
 
 	// 9. Render output
 	output, err := display.Render(result, display.RenderOptions{
-		ShowIcons:    cfg.ShowIcons,
-		ShowBranches: cfg.ShowBranchName,
-		ShowOtherPRs: cfg.ShowOtherPRs,
-		NoColor:      noColor,
-		JSON:         flagJSON,
-		GroupBy:      cfg.DefaultGroupBy,
+		ShowIcons:       cfg.ShowIcons,
+		ShowBranches:    cfg.ShowBranchName,
+		ShowOtherPRs:    cfg.ShowOtherPRs,
+		NoColor:         noColor,
+		JSON:            flagJSON,
+		GroupBy:         cfg.DefaultGroupBy,
+		ShowMatchingPRs: prFilterSet.Active(),
 	})
 	if err != nil {
 		return fmt.Errorf("render error: %w", err)
@@ -236,4 +274,34 @@ func runPRT(cmd *cobra.Command, args []string) error {
 
 	fmt.Print(output)
 	return nil
+}
+
+func buildActiveFilterSet(cfg *config.Config, viewName string, cliFilterSet prfilters.Set) (prfilters.Set, error) {
+	if viewName == "" {
+		return cliFilterSet, nil
+	}
+
+	views := config.RegisteredViews(cfg)
+	view, ok := views[viewName]
+	if !ok {
+		return prfilters.Set{}, fmt.Errorf("unknown view %q (%s)", viewName, availableViewsMessage(views))
+	}
+	viewFilterSet, err := prfilters.ParseViewFilters(viewName, view.Filters)
+	if err != nil {
+		return prfilters.Set{}, err
+	}
+
+	return prfilters.And(viewFilterSet, cliFilterSet), nil
+}
+
+func availableViewsMessage(views map[string]config.View) string {
+	if len(views) == 0 {
+		return "no views are configured; define one under the top-level views map"
+	}
+	names := make([]string, 0, len(views))
+	for name := range views {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return "available views: " + strings.Join(names, ", ")
 }

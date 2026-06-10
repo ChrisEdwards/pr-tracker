@@ -522,6 +522,139 @@ func TestRender_WithOtherPRs(t *testing.T) {
 	}
 }
 
+func TestRender_WithMatchingPRsShowsOnlyMyAndMatchingSections(t *testing.T) {
+	result := models.NewScanResult()
+	result.MyPRs = []*models.PR{
+		{
+			Number:    1,
+			Title:     "My PR stays visible",
+			URL:       "https://github.com/org/repo/pull/1",
+			Author:    "me",
+			RepoName:  "repo",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+	result.NeedsMyAttention = []*models.PR{
+		{
+			Number:    2,
+			Title:     "Needs attention hidden while filtered",
+			URL:       "https://github.com/org/repo/pull/2",
+			RepoName:  "repo",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+	result.TeamPRs = []*models.PR{
+		{
+			Number:    3,
+			Title:     "Matching team PR",
+			URL:       "https://github.com/org/repo/pull/3",
+			Author:    "alice",
+			RepoName:  "repo",
+			State:     models.PRStateOpen,
+			CreatedAt: time.Now(),
+		},
+	}
+	result.MatchingPRs = result.TeamPRs
+
+	output, err := Render(result, RenderOptions{ShowMatchingPRs: true})
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	for _, want := range []string{"MY PRS", "MATCHING PRS", "#1", "#3"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output should contain %q", want)
+		}
+	}
+	for _, unwanted := range []string{"NEEDS MY ATTENTION", "TEAM PRS", "OTHER PRS", "#2"} {
+		if strings.Contains(output, unwanted) {
+			t.Errorf("output should not contain %q when matching PRs are active", unwanted)
+		}
+	}
+	if strings.Count(output, "#1") != 1 {
+		t.Errorf("My PR should appear once, output:\n%s", output)
+	}
+}
+
+func TestRender_WithMatchingPRsDoesNotExpandStacks(t *testing.T) {
+	rootPR := &models.PR{
+		Number:     10,
+		Title:      "Stack root",
+		URL:        "https://github.com/org/repo/pull/10",
+		Author:     "alice",
+		RepoOwner:  "org",
+		RepoName:   "repo",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature",
+		BaseBranch: "main",
+		CreatedAt:  time.Now(),
+	}
+	childPR := &models.PR{
+		Number:     11,
+		Title:      "Stack child",
+		URL:        "https://github.com/org/repo/pull/11",
+		Author:     "bot[bot]",
+		RepoOwner:  "org",
+		RepoName:   "repo",
+		State:      models.PRStateOpen,
+		HeadBranch: "feature-child",
+		BaseBranch: "feature",
+		CreatedAt:  time.Now(),
+	}
+	rootNode := &models.StackNode{PR: rootPR}
+	childNode := &models.StackNode{PR: childPR, Parent: rootNode}
+	rootNode.Children = []*models.StackNode{childNode}
+	stack := &models.Stack{
+		Roots:    []*models.StackNode{rootNode},
+		AllNodes: []*models.StackNode{rootNode, childNode},
+	}
+
+	tests := []struct {
+		name      string
+		matching  []*models.PR
+		want      []string
+		doNotWant []string
+	}{
+		{
+			name:      "root match does not render non-matching child",
+			matching:  []*models.PR{rootPR},
+			want:      []string{"#10", "Stack root"},
+			doNotWant: []string{"#11", "Stack child"},
+		},
+		{
+			name:      "child match is not hidden by non-matching parent",
+			matching:  []*models.PR{childPR},
+			want:      []string{"#11", "Stack child"},
+			doNotWant: []string{"#10", "Stack root"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := models.NewScanResult()
+			result.MatchingPRs = tt.matching
+			result.Stacks = map[string]*models.Stack{"org/repo": stack}
+
+			output, err := Render(result, RenderOptions{ShowMatchingPRs: true})
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(output, want) {
+					t.Errorf("output should contain %q:\n%s", want, output)
+				}
+			}
+			for _, unwanted := range tt.doNotWant {
+				if strings.Contains(output, unwanted) {
+					t.Errorf("output should not contain %q:\n%s", unwanted, output)
+				}
+			}
+		})
+	}
+}
+
 func TestRender_WithBranches(t *testing.T) {
 	result := models.NewScanResult()
 	result.MyPRs = []*models.PR{
@@ -629,5 +762,8 @@ func TestRenderOptions_Defaults(t *testing.T) {
 	}
 	if opts.JSON {
 		t.Error("JSON should default to false")
+	}
+	if opts.ShowMatchingPRs {
+		t.Error("ShowMatchingPRs should default to false")
 	}
 }

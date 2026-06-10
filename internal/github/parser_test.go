@@ -16,6 +16,7 @@ func TestParsePRList(t *testing.T) {
 			"author": { "login": "jdoe" },
 			"state": "OPEN",
 			"isDraft": false,
+			"reviewDecision": "APPROVED",
 			"createdAt": "2024-12-15T10:30:00Z",
 			"baseRefName": "main",
 			"headRefName": "feature-auth",
@@ -79,6 +80,9 @@ func TestParsePRList(t *testing.T) {
 		if pr.CIStatus != models.CIStatusPassing {
 			t.Errorf("CIStatus = %q, want %q", pr.CIStatus, models.CIStatusPassing)
 		}
+		if pr.ReviewDecision != models.ReviewDecisionApproved {
+			t.Errorf("ReviewDecision = %q, want %q", pr.ReviewDecision, models.ReviewDecisionApproved)
+		}
 
 		// Check review requests
 		if len(pr.ReviewRequests) != 1 || pr.ReviewRequests[0] != "reviewer1" {
@@ -110,6 +114,7 @@ func TestParsePRList(t *testing.T) {
 			"author": { "login": "dev" },
 			"state": "OPEN",
 			"isDraft": true,
+			"reviewDecision": null,
 			"createdAt": "2024-12-10T08:00:00Z",
 			"baseRefName": "main",
 			"headRefName": "wip-draft",
@@ -130,6 +135,129 @@ func TestParsePRList(t *testing.T) {
 
 		if !prs[0].IsDraft {
 			t.Errorf("IsDraft = false, want true")
+		}
+		if prs[0].ReviewDecision != models.ReviewDecisionNone {
+			t.Errorf("ReviewDecision = %q, want none", prs[0].ReviewDecision)
+		}
+	})
+
+	t.Run("review decisions preserve known empty null and unknown values", func(t *testing.T) {
+		data := []byte(`[
+			{
+				"number": 1,
+				"title": "Approved",
+				"url": "https://github.com/org/repo/pull/1",
+				"author": { "login": "user1" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": "APPROVED",
+				"createdAt": "2024-12-01T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-1",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			},
+			{
+				"number": 2,
+				"title": "Review required",
+				"url": "https://github.com/org/repo/pull/2",
+				"author": { "login": "user2" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": "REVIEW_REQUIRED",
+				"createdAt": "2024-12-02T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-2",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			},
+			{
+				"number": 3,
+				"title": "Changes requested",
+				"url": "https://github.com/org/repo/pull/3",
+				"author": { "login": "user3" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": "CHANGES_REQUESTED",
+				"createdAt": "2024-12-03T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-3",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			},
+			{
+				"number": 4,
+				"title": "Empty",
+				"url": "https://github.com/org/repo/pull/4",
+				"author": { "login": "user4" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": "",
+				"createdAt": "2024-12-04T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-4",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			},
+			{
+				"number": 5,
+				"title": "Null",
+				"url": "https://github.com/org/repo/pull/5",
+				"author": { "login": "user5" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": null,
+				"createdAt": "2024-12-05T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-5",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			},
+			{
+				"number": 6,
+				"title": "Future value",
+				"url": "https://github.com/org/repo/pull/6",
+				"author": { "login": "user6" },
+				"state": "OPEN",
+				"isDraft": false,
+				"reviewDecision": "FUTURE_STATE",
+				"createdAt": "2024-12-06T00:00:00Z",
+				"baseRefName": "main",
+				"headRefName": "branch-6",
+				"statusCheckRollup": [],
+				"reviewRequests": [],
+				"assignees": [],
+				"reviews": []
+			}
+		]`)
+
+		prs, err := ParsePRList(data)
+		if err != nil {
+			t.Fatalf("ParsePRList() error = %v", err)
+		}
+
+		want := []models.ReviewDecision{
+			models.ReviewDecisionApproved,
+			models.ReviewDecisionReviewRequired,
+			models.ReviewDecisionChangesRequested,
+			models.ReviewDecisionNone,
+			models.ReviewDecisionNone,
+			models.ReviewDecision("FUTURE_STATE"),
+		}
+		for i, decision := range want {
+			if prs[i].ReviewDecision != decision {
+				t.Errorf("prs[%d].ReviewDecision = %q, want %q", i, prs[i].ReviewDecision, decision)
+			}
 		}
 	})
 

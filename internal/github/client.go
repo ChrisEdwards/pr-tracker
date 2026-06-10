@@ -11,7 +11,7 @@ import (
 )
 
 // prListJSONFields are the fields we request from gh pr list.
-const prListJSONFields = "number,title,url,author,state,isDraft,createdAt,baseRefName,headRefName,statusCheckRollup,reviewRequests,assignees,reviews"
+const prListJSONFields = "number,title,url,author,state,isDraft,reviewDecision,createdAt,baseRefName,headRefName,statusCheckRollup,reviewRequests,assignees,reviews"
 
 // Client provides methods for interacting with GitHub via the gh CLI.
 type Client interface {

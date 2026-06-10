@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -157,6 +158,55 @@ func TestGenerateConfigFile_DefaultConfig(t *testing.T) {
 	}
 	if !strings.Contains(content, `default_group_by: "project"`) {
 		t.Error("Default config should have default_group_by: project")
+	}
+}
+
+func TestGenerateConfigFile_IncludesParseableReviewNeededViewExample(t *testing.T) {
+	cfg := &Config{
+		GitHubUsername: "testuser",
+		SearchPaths:    []string{"~/code"},
+		ScanDepth:      3,
+		DefaultGroupBy: GroupByProject,
+		DefaultSort:    SortOldest,
+	}
+
+	content, err := GenerateConfigFile(cfg)
+	if err != nil {
+		t.Fatalf("GenerateConfigFile() error: %v", err)
+	}
+
+	var parsed Config
+	if err := yaml.Unmarshal([]byte(content), &parsed); err != nil {
+		t.Fatalf("Generated config is not valid YAML: %v\nContent:\n%s", err, content)
+	}
+
+	view, ok := parsed.Views["review-needed"]
+	if !ok {
+		t.Fatalf("Generated config missing review-needed view:\n%s", content)
+	}
+	for _, want := range []string{
+		"  review-needed:",
+		`    description: "Ready team PRs that do not have GitHub approval"`,
+		"      author: team",
+		"      draft: false",
+		"      bot: false",
+		"      review_decision: not-approved",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("Generated config should contain %q\nContent:\n%s", want, content)
+		}
+	}
+	if view.Description != "Ready team PRs that do not have GitHub approval" {
+		t.Fatalf("review-needed description = %q", view.Description)
+	}
+	wantFilters := map[string]interface{}{
+		"author":          "team",
+		"draft":           false,
+		"bot":             false,
+		"review_decision": "not-approved",
+	}
+	if !reflect.DeepEqual(view.Filters, wantFilters) {
+		t.Fatalf("review-needed filters = %#v, want %#v", view.Filters, wantFilters)
 	}
 }
 

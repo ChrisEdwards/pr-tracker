@@ -15,6 +15,7 @@ type ScanResult struct {
 	NeedsMyAttention []*PR `json:"needs_my_attention"`
 	TeamPRs          []*PR `json:"team_prs"`
 	OtherPRs         []*PR `json:"other_prs"`
+	MatchingPRs      []*PR `json:"matching_prs"`
 
 	// Repository information
 	ReposWithPRs    []*Repository `json:"repos_with_prs"`
@@ -38,6 +39,7 @@ func NewScanResult() *ScanResult {
 		NeedsMyAttention: make([]*PR, 0),
 		TeamPRs:          make([]*PR, 0),
 		OtherPRs:         make([]*PR, 0),
+		MatchingPRs:      make([]*PR, 0),
 		ReposWithPRs:     make([]*Repository, 0),
 		ReposWithoutPRs:  make([]*Repository, 0),
 		ReposWithErrors:  make([]*Repository, 0),

@@ -26,7 +26,7 @@ type Config struct {
 	IncludeRepos []string `yaml:"include_repos" mapstructure:"include_repos"` // Glob patterns (empty = all)
 	ScanDepth    int      `yaml:"scan_depth" mapstructure:"scan_depth"`       // Max directory depth
 
-	// Known Bots - accounts to exclude from team/other categorization
+	// Known Bot Authors - automation accounts not treated as team members
 	Bots []string `yaml:"bots" mapstructure:"bots"`
 
 	// Display options
@@ -38,6 +38,17 @@ type Config struct {
 
 	// Filtering options
 	MaxPRAgeDays int `yaml:"max_pr_age_days" mapstructure:"max_pr_age_days"` // Hide PRs older than N days (0 = no limit)
+
+	// Views - named filter bundles selectable with --view
+	Views map[string]View `yaml:"views" mapstructure:"views"`
+}
+
+// View is a named bundle of PR filters. Views intentionally support filters
+// only in v1; display, grouping, sorting, and color options are rejected.
+type View struct {
+	Description string                 `yaml:"description,omitempty" mapstructure:"description"`
+	Filters     map[string]interface{} `yaml:"filters" mapstructure:"filters"`
+	Extra       map[string]interface{} `yaml:"-" mapstructure:",remain"`
 }
 
 // IsValidGroupBy returns true if the given value is a valid GroupBy option.

@@ -40,6 +40,16 @@ const (
 	ReviewStateDismissed        ReviewState = "DISMISSED"
 )
 
+// ReviewDecision represents GitHub's aggregate review decision for a PR.
+type ReviewDecision string
+
+const (
+	ReviewDecisionNone             ReviewDecision = ""
+	ReviewDecisionApproved         ReviewDecision = "APPROVED"
+	ReviewDecisionReviewRequired   ReviewDecision = "REVIEW_REQUIRED"
+	ReviewDecisionChangesRequested ReviewDecision = "CHANGES_REQUESTED"
+)
+
 // Review represents a single code review on a PR.
 type Review struct {
 	Author    string      `json:"author"`
@@ -72,9 +82,10 @@ type PR struct {
 	CIStatus CIStatus `json:"ci_status"`
 
 	// Review Information
-	ReviewRequests []string `json:"review_requests"`
-	Assignees      []string `json:"assignees"`
-	Reviews        []Review `json:"reviews"`
+	ReviewDecision ReviewDecision `json:"review_decision"`
+	ReviewRequests []string       `json:"review_requests"`
+	Assignees      []string       `json:"assignees"`
+	Reviews        []Review       `json:"reviews"`
 
 	// Computed (set during categorization)
 	IsReviewRequestedFromMe bool        `json:"is_review_requested_from_me"`

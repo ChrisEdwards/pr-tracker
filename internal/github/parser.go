@@ -18,6 +18,7 @@ type ghPR struct {
 	} `json:"author"`
 	State             string          `json:"state"`
 	IsDraft           bool            `json:"isDraft"`
+	ReviewDecision    string          `json:"reviewDecision"`
 	CreatedAt         string          `json:"createdAt"`
 	BaseRefName       string          `json:"baseRefName"`
 	HeadRefName       string          `json:"headRefName"`
@@ -111,6 +112,7 @@ func convertPR(gpr ghPR) (*models.PR, error) {
 		HeadBranch:     gpr.HeadRefName,
 		CreatedAt:      createdAt,
 		CIStatus:       computeCIStatus(gpr.StatusCheckRollup),
+		ReviewDecision: models.ReviewDecision(gpr.ReviewDecision),
 		ReviewRequests: reviewRequests,
 		Assignees:      assignees,
 		Reviews:        reviews,

@@ -226,12 +226,13 @@ func RenderPRSimple(pr *models.PR, showIcons bool, showBranches bool) string {
 
 // RenderOptions configures the output rendering behavior.
 type RenderOptions struct {
-	ShowIcons    bool   // Show emoji icons for sections and status
-	ShowBranches bool   // Show branch names (head → base)
-	ShowOtherPRs bool   // Show "Other PRs" section (external contributors, bots)
-	NoColor      bool   // Disable all color output
-	JSON         bool   // Output as JSON instead of styled text
-	GroupBy      string // Group PRs by: "project" (default) or "author"
+	ShowIcons       bool   // Show emoji icons for sections and status
+	ShowBranches    bool   // Show branch names (head → base)
+	ShowOtherPRs    bool   // Show "Other PRs" section (external contributors, bots)
+	NoColor         bool   // Disable all color output
+	JSON            bool   // Output as JSON instead of styled text
+	GroupBy         string // Group PRs by: "project" (default) or "author"
+	ShowMatchingPRs bool   // Show My PRs plus "Matching PRs" instead of default sections
 }
 
 // Render orchestrates the complete terminal output from a ScanResult.
@@ -244,7 +245,8 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 	// Handle JSON mode
 	if opts.JSON {
 		return RenderJSON(result, JSONOptions{
-			ShowOtherPRs: opts.ShowOtherPRs,
+			ShowOtherPRs:    opts.ShowOtherPRs,
+			ShowMatchingPRs: opts.ShowMatchingPRs,
 		})
 	}
 
@@ -275,6 +277,23 @@ func Render(result *models.ScanResult, opts RenderOptions) (string, error) {
 		sectionOpts,
 	))
 	b.WriteString("\n")
+
+	if opts.ShowMatchingPRs {
+		// Matching PRs is already a filtered list. Do not expand stack trees here:
+		// stack expansion can show non-matching children or hide matching children
+		// whose parent did not match the active filters.
+		b.WriteString(RenderSection(
+			"MATCHING PRS",
+			"",
+			result.MatchingPRs,
+			nil,
+			sectionOpts,
+		))
+		b.WriteString("\n")
+		b.WriteString(renderFooter(result))
+
+		return b.String(), nil
+	}
 
 	// Needs My Attention section
 	b.WriteString(RenderSection(

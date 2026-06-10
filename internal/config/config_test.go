@@ -1,8 +1,10 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -67,6 +69,240 @@ func TestLoad_WithFilter(t *testing.T) {
 
 	if len(cfg.IncludeRepos) != 1 || cfg.IncludeRepos[0] != "org/*" {
 		t.Errorf("IncludeRepos = %v, want [org/*]", cfg.IncludeRepos)
+	}
+}
+
+func TestLoad_WithViews(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigForLoadTest(t, tmpDir, `
+github_username: "me"
+search_paths:
+  - "`+tmpDir+`"
+default_group_by: "project"
+default_sort: "oldest"
+scan_depth: 3
+views:
+  alice-review:
+    description: "Alice's ready PRs that still need approval"
+    filters:
+      author: "@alice"
+      draft: false
+      bot: false
+      review_decision: "not-approved"
+`)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	view, ok := cfg.Views["alice-review"]
+	if !ok {
+		t.Fatalf("Views missing alice-review: %#v", cfg.Views)
+	}
+	if view.Description != "Alice's ready PRs that still need approval" {
+		t.Fatalf("Description = %q", view.Description)
+	}
+	wantFilters := map[string]interface{}{
+		"author":          "@alice",
+		"draft":           false,
+		"bot":             false,
+		"review_decision": "not-approved",
+	}
+	if !reflect.DeepEqual(view.Filters, wantFilters) {
+		t.Fatalf("Filters = %#v, want %#v", view.Filters, wantFilters)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error: %v", err)
+	}
+}
+
+func TestLoad_WithUnsupportedViewOption(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigForLoadTest(t, tmpDir, `
+github_username: "me"
+search_paths:
+  - "`+tmpDir+`"
+default_group_by: "project"
+default_sort: "oldest"
+scan_depth: 3
+views:
+  alice-review:
+    default_group_by: "author"
+    filters:
+      author: "@alice"
+`)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	err = cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want unsupported view option error")
+	}
+	if !contains(err.Error(), "views.alice-review.default_group_by is not supported") {
+		t.Fatalf("Validate() error = %q, want unsupported view option", err.Error())
+	}
+}
+
+func TestConfigValidate_Views(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name    string
+		views   map[string]View
+		wantErr string
+	}{
+		{
+			name: "valid view",
+			views: map[string]View{
+				"alice-review": {
+					Description: "Alice's ready PRs that still need approval",
+					Filters: map[string]interface{}{
+						"author":          "@alice",
+						"draft":           false,
+						"bot":             false,
+						"review_decision": "not-approved",
+					},
+				},
+			},
+		},
+		{
+			name: "missing filters",
+			views: map[string]View{
+				"alice-review": {
+					Description: "missing filters",
+				},
+			},
+			wantErr: "views.alice-review.filters is required",
+		},
+		{
+			name: "empty filters",
+			views: map[string]View{
+				"alice-review": {
+					Description: "empty filters",
+					Filters:     map[string]interface{}{},
+				},
+			},
+			wantErr: "views.alice-review.filters must contain at least one filter",
+		},
+		{
+			name: "unsupported view option",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"draft": false},
+					Extra:   map[string]interface{}{"default_group_by": "author"},
+				},
+			},
+			wantErr: "views.alice-review.default_group_by is not supported",
+		},
+		{
+			name: "unsupported filter key",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"group": "author"},
+				},
+			},
+			wantErr: "views.alice-review.filters.group is not supported",
+		},
+		{
+			name: "draft must be boolean",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"draft": "false"},
+				},
+			},
+			wantErr: "views.alice-review.filters.draft must be a boolean",
+		},
+		{
+			name: "author must be string",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"author": false},
+				},
+			},
+			wantErr: "views.alice-review.filters.author must be a string",
+		},
+		{
+			name: "author must be supported value",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"author": "alice"},
+				},
+			},
+			wantErr: "views.alice-review.filters.author has invalid value",
+		},
+		{
+			name: "review decision must be supported value",
+			views: map[string]View{
+				"alice-review": {
+					Filters: map[string]interface{}{"review_decision": "waiting"},
+				},
+			},
+			wantErr: "views.alice-review.filters.review_decision has invalid value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				GitHubUsername: "me",
+				SearchPaths:    []string{tmpDir},
+				DefaultGroupBy: GroupByProject,
+				DefaultSort:    SortOldest,
+				ScanDepth:      3,
+				Views:          tt.views,
+			}
+
+			err := cfg.Validate()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("Validate() error = nil, want error")
+			}
+			if !contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Validate() error = %q, want it to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRegisteredViews_ConfigOverridesBuiltIns(t *testing.T) {
+	restore := replaceBuiltInViewsForTest(map[string]View{
+		"same-name": {
+			Description: "built in",
+			Filters:     map[string]interface{}{"author": "team"},
+		},
+		"built-in-only": {
+			Description: "built in only",
+			Filters:     map[string]interface{}{"draft": false},
+		},
+	})
+	defer restore()
+
+	cfg := &Config{
+		Views: map[string]View{
+			"same-name": {
+				Description: "user defined",
+				Filters:     map[string]interface{}{"author": "@alice"},
+			},
+		},
+	}
+
+	views := RegisteredViews(cfg)
+	if views["same-name"].Description != "user defined" {
+		t.Fatalf("same-name Description = %q, want user override", views["same-name"].Description)
+	}
+	if got := views["same-name"].Filters["author"]; got != "@alice" {
+		t.Fatalf("same-name author filter = %#v, want @alice", got)
+	}
+	if _, ok := views["built-in-only"]; !ok {
+		t.Fatal("RegisteredViews() should include built-in views not overridden by config")
 	}
 }
 
@@ -528,5 +764,26 @@ func TestValidate_MultipleErrors(t *testing.T) {
 	// Should have 5 errors
 	if len(ve.Errors) != 5 {
 		t.Errorf("ValidationError.Errors = %d errors, want 5", len(ve.Errors))
+	}
+}
+
+func writeConfigForLoadTest(t *testing.T, homeDir, content string) {
+	t.Helper()
+	t.Setenv("HOME", homeDir)
+
+	configDir := filepath.Join(homeDir, ".prt")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+}
+
+func replaceBuiltInViewsForTest(views map[string]View) func() {
+	previous := builtInViews
+	builtInViews = maps.Clone(views)
+	return func() {
+		builtInViews = previous
 	}
 }

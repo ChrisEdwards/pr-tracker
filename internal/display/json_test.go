@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"prt/internal/config"
 	"prt/internal/models"
+	"prt/internal/prfilters"
 )
 
 func TestRenderJSON_EmptyResult(t *testing.T) {
@@ -339,4 +341,177 @@ func TestRenderJSON_ShowOtherPRs_False(t *testing.T) {
 	if len(parsed.OtherPRs) != 0 {
 		t.Errorf("Expected 0 OtherPRs with ShowOtherPRs=false, got %d", len(parsed.OtherPRs))
 	}
+}
+
+func TestRenderJSON_WithMatchingPRs(t *testing.T) {
+	result := models.NewScanResult()
+	result.Username = "me"
+	result.MyPRs = []*models.PR{
+		{Number: 1, Title: "My PR", Author: "me"},
+	}
+	result.NeedsMyAttention = []*models.PR{
+		{Number: 2, Title: "Hidden needs attention", Author: "alice"},
+	}
+	result.TeamPRs = []*models.PR{
+		{Number: 3, Title: "Matching team PR", Author: "alice"},
+	}
+	result.MatchingPRs = result.TeamPRs
+
+	output, err := RenderJSON(result, JSONOptions{ShowMatchingPRs: true})
+	if err != nil {
+		t.Fatalf("RenderJSON() error = %v", err)
+	}
+
+	var parsed struct {
+		MyPRs            []*models.PR `json:"my_prs"`
+		MatchingPRs      []*models.PR `json:"matching_prs"`
+		NeedsMyAttention []*models.PR `json:"needs_my_attention"`
+		TeamPRs          []*models.PR `json:"team_prs"`
+		OtherPRs         []*models.PR `json:"other_prs"`
+		TotalPRs         int          `json:"total_prs"`
+	}
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Fatalf("Output is not valid JSON: %v", err)
+	}
+
+	if len(parsed.MyPRs) != 1 || parsed.MyPRs[0].Number != 1 {
+		t.Fatalf("my_prs = %#v, want only PR #1", parsed.MyPRs)
+	}
+	if len(parsed.MatchingPRs) != 1 || parsed.MatchingPRs[0].Number != 3 {
+		t.Fatalf("matching_prs = %#v, want only PR #3", parsed.MatchingPRs)
+	}
+	if len(parsed.NeedsMyAttention) != 0 || len(parsed.TeamPRs) != 0 || len(parsed.OtherPRs) != 0 {
+		t.Fatalf("category fields should be omitted while matching_prs is active: %s", output)
+	}
+	if parsed.TotalPRs != 2 {
+		t.Errorf("total_prs = %d, want 2", parsed.TotalPRs)
+	}
+}
+
+func TestRenderJSON_WithBotFilterMatchingPRs(t *testing.T) {
+	result := models.NewScanResult()
+	result.Username = "me"
+	result.MyPRs = []*models.PR{
+		{Number: 1, Title: "My PR stays visible", Author: "me"},
+	}
+	result.NeedsMyAttention = []*models.PR{
+		{Number: 2, Title: "Human needs attention", Author: "alice"},
+	}
+	result.OtherPRs = []*models.PR{
+		{Number: 3, Title: "Configured bot", Author: "release-service"},
+		{Number: 4, Title: "Suffix bot", Author: "github-app[bot]"},
+	}
+
+	set, err := prfilters.ParseFlags("", "", "true", "")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	filtered := set.Apply(result, &config.Config{
+		GitHubUsername: "me",
+		Bots:           []string{"release-service"},
+	})
+
+	output, err := RenderJSON(filtered, JSONOptions{ShowMatchingPRs: true})
+	if err != nil {
+		t.Fatalf("RenderJSON() error = %v", err)
+	}
+
+	var parsed struct {
+		MyPRs            []*models.PR `json:"my_prs"`
+		MatchingPRs      []*models.PR `json:"matching_prs"`
+		NeedsMyAttention []*models.PR `json:"needs_my_attention"`
+		TotalPRs         int          `json:"total_prs"`
+	}
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Fatalf("Output is not valid JSON: %v", err)
+	}
+
+	if got := len(parsed.MyPRs); got != 1 {
+		t.Fatalf("my_prs length = %d, want 1", got)
+	}
+	if got := prNumbers(parsed.MatchingPRs); !sameNumbers(got, []int{3, 4}) {
+		t.Fatalf("matching_prs = %v, want [3 4]", got)
+	}
+	if len(parsed.NeedsMyAttention) != 0 {
+		t.Fatalf("needs_my_attention should be omitted while matching_prs is active: %s", output)
+	}
+	if parsed.TotalPRs != 3 {
+		t.Fatalf("total_prs = %d, want 3", parsed.TotalPRs)
+	}
+}
+
+func TestRenderJSON_WithReviewDecisionFilterMatchingPRs(t *testing.T) {
+	result := models.NewScanResult()
+	result.Username = "me"
+	result.MyPRs = []*models.PR{
+		{Number: 1, Title: "My approved PR stays visible", Author: "me", ReviewDecision: models.ReviewDecisionApproved},
+	}
+	result.NeedsMyAttention = []*models.PR{
+		{Number: 2, Title: "Review required", Author: "alice", ReviewDecision: models.ReviewDecisionReviewRequired},
+	}
+	result.TeamPRs = []*models.PR{
+		{Number: 3, Title: "Approved", Author: "bob", ReviewDecision: models.ReviewDecisionApproved},
+	}
+	result.OtherPRs = []*models.PR{
+		{Number: 4, Title: "Unknown decision", Author: "mallory", ReviewDecision: models.ReviewDecision("FUTURE_STATE")},
+	}
+
+	set, err := prfilters.ParseFlags("", "", "", "not-approved")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	filtered := set.Apply(result, &config.Config{GitHubUsername: "me"})
+
+	output, err := RenderJSON(filtered, JSONOptions{ShowMatchingPRs: true})
+	if err != nil {
+		t.Fatalf("RenderJSON() error = %v", err)
+	}
+
+	var parsed struct {
+		MyPRs       []*models.PR `json:"my_prs"`
+		MatchingPRs []*models.PR `json:"matching_prs"`
+		TotalPRs    int          `json:"total_prs"`
+	}
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Fatalf("Output is not valid JSON: %v", err)
+	}
+
+	if got := prNumbers(parsed.MyPRs); !sameNumbers(got, []int{1}) {
+		t.Fatalf("my_prs = %v, want [1]", got)
+	}
+	if got := prNumbers(parsed.MatchingPRs); !sameNumbers(got, []int{2, 4}) {
+		t.Fatalf("matching_prs = %v, want [2 4]", got)
+	}
+	if parsed.MatchingPRs[0].ReviewDecision != models.ReviewDecisionReviewRequired {
+		t.Fatalf("matching_prs[0].review_decision = %q, want REVIEW_REQUIRED", parsed.MatchingPRs[0].ReviewDecision)
+	}
+	if parsed.MatchingPRs[1].ReviewDecision != models.ReviewDecision("FUTURE_STATE") {
+		t.Fatalf("matching_prs[1].review_decision = %q, want FUTURE_STATE", parsed.MatchingPRs[1].ReviewDecision)
+	}
+	if !strings.Contains(output, `"review_decision": "REVIEW_REQUIRED"`) {
+		t.Fatalf("output should include review_decision field: %s", output)
+	}
+	if parsed.TotalPRs != 3 {
+		t.Fatalf("total_prs = %d, want 3", parsed.TotalPRs)
+	}
+}
+
+func prNumbers(prs []*models.PR) []int {
+	numbers := make([]int, 0, len(prs))
+	for _, pr := range prs {
+		numbers = append(numbers, pr.Number)
+	}
+	return numbers
+}
+
+func sameNumbers(got, want []int) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }

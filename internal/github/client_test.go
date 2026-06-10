@@ -3,6 +3,7 @@ package github
 import (
 	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 )
@@ -385,6 +386,7 @@ func TestListPRs_CommandArgs(t *testing.T) {
 	foundPR := false
 	foundList := false
 	foundJSON := false
+	foundReviewDecision := false
 	foundState := false
 
 	for i, arg := range capturedArgs {
@@ -396,6 +398,9 @@ func TestListPRs_CommandArgs(t *testing.T) {
 		}
 		if arg == "--json" {
 			foundJSON = true
+			if i+1 < len(capturedArgs) && strings.Contains(capturedArgs[i+1], "reviewDecision") {
+				foundReviewDecision = true
+			}
 		}
 		if arg == "--state" && i+1 < len(capturedArgs) && capturedArgs[i+1] == "open" {
 			foundState = true
@@ -410,6 +415,9 @@ func TestListPRs_CommandArgs(t *testing.T) {
 	}
 	if !foundJSON {
 		t.Error("expected '--json' in args")
+	}
+	if !foundReviewDecision {
+		t.Errorf("expected --json fields to include reviewDecision, got args %v", capturedArgs)
 	}
 	if !foundState {
 		t.Error("expected '--state open' in args")

@@ -195,6 +195,34 @@ func TestCategorize_BotPRs(t *testing.T) {
 	}
 }
 
+func TestCategorize_BotAuthorsAreNotTeamMembers(t *testing.T) {
+	c := NewCategorizer()
+	cfg := &config.Config{
+		TeamMembers: []string{"alice", "automation[bot]", "release-service"},
+		Bots:        []string{"release-service"},
+	}
+
+	repos := []*models.Repository{
+		{
+			Name: "test-repo",
+			PRs: []*models.PR{
+				{Number: 1, Title: "Human team PR", Author: "alice"},
+				{Number: 2, Title: "Suffix bot", Author: "automation[bot]"},
+				{Number: 3, Title: "Configured bot", Author: "release-service"},
+			},
+		},
+	}
+
+	result := c.Categorize(repos, cfg, "testuser")
+
+	if got := prNumbers(result.TeamPRs); len(got) != 1 || got[0] != 1 {
+		t.Fatalf("TeamPRs = %v, want only human team PR #1", got)
+	}
+	if got := prNumbers(result.OtherPRs); len(got) != 2 || got[0] != 2 || got[1] != 3 {
+		t.Fatalf("OtherPRs = %v, want bot PRs [2 3]", got)
+	}
+}
+
 func TestCategorize_RepoWithError(t *testing.T) {
 	c := NewCategorizer()
 	cfg := &config.Config{}
@@ -555,4 +583,12 @@ func TestCategorize_MaxPRAgeDays_NoLimit(t *testing.T) {
 	if len(result.MyPRs) != 2 {
 		t.Errorf("Expected 2 PRs in MyPRs (no age limit), got %d", len(result.MyPRs))
 	}
+}
+
+func prNumbers(prs []*models.PR) []int {
+	numbers := make([]int, 0, len(prs))
+	for _, pr := range prs {
+		numbers = append(numbers, pr.Number)
+	}
+	return numbers
 }

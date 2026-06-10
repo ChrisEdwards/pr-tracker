@@ -169,3 +169,18 @@ func TestReviewState_Values(t *testing.T) {
 		t.Errorf("ReviewStateDismissed = %v, want DISMISSED", ReviewStateDismissed)
 	}
 }
+
+func TestReviewDecision_Values(t *testing.T) {
+	if ReviewDecisionNone != "" {
+		t.Errorf("ReviewDecisionNone = %v, want empty string", ReviewDecisionNone)
+	}
+	if ReviewDecisionApproved != "APPROVED" {
+		t.Errorf("ReviewDecisionApproved = %v, want APPROVED", ReviewDecisionApproved)
+	}
+	if ReviewDecisionReviewRequired != "REVIEW_REQUIRED" {
+		t.Errorf("ReviewDecisionReviewRequired = %v, want REVIEW_REQUIRED", ReviewDecisionReviewRequired)
+	}
+	if ReviewDecisionChangesRequested != "CHANGES_REQUESTED" {
+		t.Errorf("ReviewDecisionChangesRequested = %v, want CHANGES_REQUESTED", ReviewDecisionChangesRequested)
+	}
+}

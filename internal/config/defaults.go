@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// KnownBots is a pre-populated list of common GitHub bot accounts.
-// These are used to filter out bot PRs from the "team" and "other" categories.
+// KnownBots is a pre-populated list of common GitHub Bot Authors.
+// These authors are not treated as team members for categorization or filters.
 var KnownBots = []string{
 	"dependabot[bot]",
 	"dependabot",
@@ -34,13 +34,14 @@ var DefaultConfig = Config{
 	SearchPaths:    []string{},     // Must be set by user
 	IncludeRepos:   []string{},     // Empty = match all repos
 	ScanDepth:      3,              // Reasonable default depth
-	Bots:           KnownBots,      // Pre-populated bot list
+	Bots:           KnownBots,      // Pre-populated known Bot Authors
 	DefaultGroupBy: GroupByProject, // Group by project by default
 	DefaultSort:    SortOldest,     // Show oldest PRs first (needs attention)
 	ShowBranchName: true,           // Show branch names
 	ShowIcons:      true,           // Show status icons
 	ShowOtherPRs:   false,          // Hide "Other PRs" by default
 	MaxPRAgeDays:   0,              // No age limit by default (0 = show all)
+	Views:          map[string]View{},
 }
 
 // ConfigDir returns the path to the PRT configuration directory.

@@ -19,7 +19,8 @@ PRT solves "PR Fatigue" - the cognitive burden of tracking PRs across many repos
 - **Multi-repo scanning** - Discover Git repos in configured directories
 - **Smart categorization** - PRs sorted by your relationship to them
 - **Stack detection** - Visualize dependent PR chains (stacked PRs)
-- **Bot filtering** - Auto-deprioritize dependabot, renovate, etc.
+- **Bot Author filtering** - Include or exclude dependabot, renovate, GitHub Apps, and known automation accounts
+- **Review Decision filtering** - Filter by GitHub's aggregate approval state
 - **Beautiful output** - Styled terminal UI with icons
 - **JSON output** - Pipe to `jq` for scripting
 - **Zero config** - Setup wizard on first run
@@ -88,6 +89,24 @@ prt -s newest
 # Output as JSON for scripting
 prt --json | jq '.needs_my_attention | length'
 
+# Show my PRs plus non-draft team PRs that GitHub does not consider approved
+prt --author=team --draft=false --bot=false --review-decision=not-approved
+
+# Show my PRs plus non-bot Matching PRs
+prt --bot=false
+
+# Show my PRs plus Matching PRs that GitHub does not consider approved
+prt --review-decision=not-approved
+
+# Use the built-in review-needed View for the same review workflow
+prt --view=review-needed
+
+# Narrow the built-in review-needed View with an extra CLI filter
+prt --view=review-needed --author=@alice
+
+# Show my PRs plus PRs authored by a specific user
+prt --author=@alice
+
 # Disable colors (for piping)
 prt --no-color > prs.txt
 ```
@@ -98,6 +117,11 @@ prt --no-color > prs.txt
 |------|-------|-------------|
 | `--path` | `-p` | Override search paths from config |
 | `--filter` | `-f` | Filter repos by name pattern (glob) |
+| `--author=<value>` | | Filter Matching PRs by author: `me`, `team`, `other`, or `@username` |
+| `--draft=<true\|false>` | | Filter Matching PRs by draft state |
+| `--bot=<true\|false>` | | Filter Matching PRs by Bot Author status |
+| `--review-decision=<value>` | | Filter Matching PRs by Review Decision: `approved`, `not-approved`, `review-required`, `changes-requested`, or `none` |
+| `--view=<name>` | | Apply a named View to Matching PRs; use `--view=review-needed` for ready team PRs without approval |
 | `--group` | `-g` | Group by: `project` or `author` |
 | `--sort` | `-s` | Sort by: `oldest` or `newest` |
 | `--depth` | `-d` | Scan depth (default: 3) |
@@ -134,7 +158,7 @@ include_repos:
 # Max directory depth when scanning (default: 3)
 scan_depth: 3
 
-# Known bot accounts (pre-populated, add your own)
+# Known Bot Authors (pre-populated, add your own)
 bots:
   - "dependabot[bot]"
   - "renovate[bot]"
@@ -149,6 +173,16 @@ show_other_prs: false        # Show "Other PRs" section
 
 # Filtering options
 max_pr_age_days: 0           # Hide PRs older than N days (0 = no limit)
+
+# Custom Views are named filter bundles
+views:
+  review-needed:
+    description: "Ready team PRs that do not have GitHub approval"
+    filters:
+      author: team
+      draft: false
+      bot: false
+      review_decision: not-approved
 ```
 
 ### Configuration Options
@@ -160,13 +194,14 @@ max_pr_age_days: 0           # Hide PRs older than N days (0 = no limit)
 | `search_paths` | `[]` | Directories to scan |
 | `include_repos` | `[]` | Glob patterns to filter repos |
 | `scan_depth` | `3` | Max directory depth |
-| `bots` | (see defaults) | Known bot accounts |
+| `bots` | (see defaults) | Additional known Bot Authors |
 | `default_group_by` | `project` | Group PRs by project or author |
 | `default_sort` | `oldest` | Sort by oldest or newest first |
 | `show_branch_name` | `true` | Show branch names |
 | `show_icons` | `true` | Show emoji icons |
 | `show_other_prs` | `false` | Show "Other PRs" section |
 | `max_pr_age_days` | `0` | Hide PRs older than N days (0 = no limit) |
+| `views` | built-in `review-needed` | Named filter bundles selectable with `--view=<name>`; config-defined Views with the same name replace built-ins |
 
 ### Environment Variables
 
@@ -201,12 +236,51 @@ PRs where:
 - You haven't approved yet
 
 ### Team PRs
-PRs from users in your `team_members` list.
+PRs from users in your `team_members` list. Bot Authors are not treated as Team PRs, even if listed in `team_members`.
 
 ### Other PRs
 Everything else, including:
 - External contributors
-- Bots (dependabot, renovate, etc.)
+- Bot Authors (dependabot, renovate, GitHub Apps, etc.)
+
+### Matching PRs
+When `--author=<value>`, `--draft=<true|false>`, `--bot=<true|false>`, `--review-decision=<value>`, or `--view=<name>` is active, PRT keeps My PRs visible and replaces the default Needs My Attention, Team PRs, and Other PRs sections with a single Matching PRs section. Matching PRs never includes your own PRs.
+
+Author filter values:
+- `--author=me`: PRs authored by your configured/current GitHub user. My PRs still stay in the My PRs section, so Matching PRs is normally empty for this filter.
+- `--author=team`: PRs authored by configured `team_members`, excluding your configured/current user because My PRs are shown separately and excluding Bot Authors.
+- `--author=other`: PRs not authored by you, not authored by configured `team_members`, and not authored by Bot Authors.
+- `--author=@alice`: PRs authored exactly by `alice`.
+
+Draft filter values:
+- `--draft=true`: PRs whose effective state is draft.
+- `--draft=false`: PRs whose effective state is not draft.
+
+Bot filter values:
+- `--bot=true`: PRs authored by Bot Authors.
+- `--bot=false`: PRs not authored by Bot Authors.
+
+Bot Authors are detected from the configured `bots` list and from usernames ending in `[bot]`.
+
+Review Decision filter values:
+- `--review-decision=approved`: PRs whose GitHub Review Decision is `APPROVED`.
+- `--review-decision=not-approved`: PRs whose GitHub Review Decision is anything other than `APPROVED`, including `REVIEW_REQUIRED`, `CHANGES_REQUESTED`, empty/null decisions, and unknown future GitHub values.
+- `--review-decision=review-required`: PRs whose GitHub Review Decision is `REVIEW_REQUIRED`.
+- `--review-decision=changes-requested`: PRs whose GitHub Review Decision is `CHANGES_REQUESTED`.
+- `--review-decision=none`: PRs with an empty/null GitHub Review Decision.
+
+Review Decision filtering uses GitHub's aggregate `reviewDecision` value as the source of truth; it does not infer approval status from individual review records. The `not-approved` filter is independent from draft status, so draft PRs can match unless you also pass `--draft=false`.
+
+Views:
+- Define Views under top-level `views`.
+- Each View may include `description` and must include `filters`.
+- Supported View filter keys are `author`, `draft`, `bot`, and `review_decision`.
+- Views cannot set display, grouping, sorting, color, or section options in v1.
+- `review-needed` is built in and works even when your config has no `views` section. It is equivalent to `prt --author=team --draft=false --bot=false --review-decision=not-approved`.
+- `prt --view=review-needed` keeps My PRs visible and shows Matching PRs for ready Team Member PRs, excluding Bot Authors and PRs whose GitHub Review Decision is `APPROVED`.
+- External PRs do not match `review-needed` merely because they request your review; use another View or direct filters for that workflow.
+- A config-defined `views.review-needed` replaces the built-in View.
+- Additional CLI filters narrow the selected View with AND composition. For example, `prt --view=review-needed --author=@alice` shows PRs matching both the built-in View and `@alice`.
 
 ## Stacked PRs
 
@@ -226,6 +300,12 @@ Use `--json` for scripting:
 ```bash
 # Count PRs needing your attention
 prt --json | jq '.needs_my_attention | length'
+
+# Count non-draft team PRs matching active filters while excluding Bot Authors
+prt --author=team --draft=false --bot=false --json | jq '.matching_prs | length'
+
+# Count PRs GitHub does not consider approved
+prt --review-decision=not-approved --json | jq '.matching_prs | length'
 
 # List all PR URLs
 prt --json | jq '.my_prs[].url'
@@ -247,6 +327,7 @@ Top-level structure:
 | `needs_my_attention` | `PR[]` | PRs requesting your review or assigned to you |
 | `team_prs` | `PR[]` | PRs from your configured team members |
 | `other_prs` | `PR[]` | All other PRs |
+| `matching_prs` | `PR[]` | PRs matching active `--author`/`--draft`/`--bot`/`--review-decision` filters; present when filters are active |
 | `repos_with_prs` | `Repository[]` | Repositories with open PRs |
 | `repos_without_prs` | `Repository[]` | Repositories with no open PRs |
 | `repos_with_errors` | `Repository[]` | Repositories that failed to scan |
@@ -270,6 +351,7 @@ PR object:
 | `head_branch` | `string` | Source branch |
 | `created_at` | `string` | ISO 8601 timestamp |
 | `ci_status` | `string` | `passing`, `failing`, `pending`, or `none` |
+| `review_decision` | `string` | GitHub Review Decision, such as `APPROVED`, `REVIEW_REQUIRED`, `CHANGES_REQUESTED`, empty string, or an unknown future value |
 | `review_requests` | `string[]` | Usernames requested to review |
 | `assignees` | `string[]` | Assigned usernames |
 | `reviews` | `Review[]` | Code reviews |

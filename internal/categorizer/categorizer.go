@@ -6,6 +6,7 @@ import (
 
 	"prt/internal/config"
 	"prt/internal/models"
+	"prt/internal/prfilters"
 	"prt/internal/stacks"
 )
 
@@ -28,14 +29,13 @@ func NewCategorizer() Categorizer {
 // relationship to each PR:
 //   - My PRs: PRs authored by the current user
 //   - Needs My Attention: PRs where review is requested or user is assigned (and not yet approved)
-//   - Team PRs: PRs authored by team members
-//   - Other PRs: PRs from everyone else (including bots)
+//   - Team PRs: PRs authored by team members who are not Bot Authors
+//   - Other PRs: PRs from everyone else, including Bot Authors
 func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config, username string) *models.ScanResult {
 	result := models.NewScanResult()
 	result.Username = username
 
 	teamSet := toSet(cfg.TeamMembers)
-	botSet := toSet(cfg.Bots)
 
 	for _, repo := range repos {
 		// Handle repos with errors
@@ -73,7 +73,7 @@ func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config,
 			pr.MyReviewStatus = findMyReviewStatus(pr.Reviews, username)
 
 			// Categorize
-			c.categorizePR(pr, username, teamSet, botSet, result)
+			c.categorizePR(pr, username, teamSet, cfg.Bots, result)
 		}
 	}
 
@@ -86,7 +86,9 @@ func (c *categorizer) Categorize(repos []*models.Repository, cfg *config.Config,
 }
 
 // categorizePR determines which category a PR belongs to and adds it to the result.
-func (c *categorizer) categorizePR(pr *models.PR, username string, teamSet, botSet map[string]bool, result *models.ScanResult) {
+func (c *categorizer) categorizePR(pr *models.PR, username string, teamSet map[string]bool, botAuthors []string, result *models.ScanResult) {
+	isBot := prfilters.IsBotAuthor(pr.Author, botAuthors)
+
 	switch {
 	case pr.Author == username:
 		// My PR
@@ -98,17 +100,17 @@ func (c *categorizer) categorizePR(pr *models.PR, username string, teamSet, botS
 			result.NeedsMyAttention = append(result.NeedsMyAttention, pr)
 		} else {
 			// I approved it, categorize based on author
-			if teamSet[pr.Author] {
+			if teamSet[pr.Author] && !isBot {
 				result.TeamPRs = append(result.TeamPRs, pr)
 			} else {
 				result.OtherPRs = append(result.OtherPRs, pr)
 			}
 		}
 
-	case teamSet[pr.Author]:
+	case teamSet[pr.Author] && !isBot:
 		result.TeamPRs = append(result.TeamPRs, pr)
 
-	case botSet[pr.Author]:
+	case isBot:
 		result.OtherPRs = append(result.OtherPRs, pr)
 
 	default:

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -54,6 +55,8 @@ func (c *Config) Validate() error {
 		errs = append(errs, "scan_depth must be at least 1")
 	}
 
+	errs = append(errs, c.validateViews()...)
+
 	if len(errs) > 0 {
 		return &ValidationError{Errors: errs}
 	}
@@ -94,6 +97,7 @@ func Load(flags *Flags) (*Config, error) {
 	v.SetDefault("show_icons", DefaultConfig.ShowIcons)
 	v.SetDefault("show_other_prs", DefaultConfig.ShowOtherPRs)
 	v.SetDefault("max_pr_age_days", DefaultConfig.MaxPRAgeDays)
+	v.SetDefault("views", DefaultConfig.Views)
 
 	// 2. Load config file
 	v.SetConfigName("config")
@@ -145,6 +149,88 @@ func Load(flags *Flags) (*Config, error) {
 	cfg.SearchPaths = ExpandPaths(cfg.SearchPaths)
 
 	return &cfg, nil
+}
+
+func (c *Config) validateViews() []string {
+	var errs []string
+	for _, name := range sortedViewNames(c.Views) {
+		view := c.Views[name]
+		if len(view.Extra) > 0 {
+			for _, key := range sortedMapKeys(view.Extra) {
+				errs = append(errs, fmt.Sprintf("views.%s.%s is not supported (views only support description and filters in v1)", name, key))
+			}
+		}
+		if view.Filters == nil {
+			errs = append(errs, fmt.Sprintf("views.%s.filters is required", name))
+			continue
+		}
+		if len(view.Filters) == 0 {
+			errs = append(errs, fmt.Sprintf("views.%s.filters must contain at least one filter", name))
+			continue
+		}
+		for _, key := range sortedMapKeys(view.Filters) {
+			value := view.Filters[key]
+			switch key {
+			case "author":
+				author, ok := value.(string)
+				if !ok {
+					errs = append(errs, fmt.Sprintf("views.%s.filters.author must be a string", name))
+				} else if !isValidViewAuthor(author) {
+					errs = append(errs, fmt.Sprintf("views.%s.filters.author has invalid value %q (must be me, team, other, or @username)", name, author))
+				}
+			case "review_decision":
+				reviewDecision, ok := value.(string)
+				if !ok {
+					errs = append(errs, fmt.Sprintf("views.%s.filters.review_decision must be a string", name))
+				} else if !isValidViewReviewDecision(reviewDecision) {
+					errs = append(errs, fmt.Sprintf("views.%s.filters.review_decision has invalid value %q (must be approved, not-approved, review-required, changes-requested, or none)", name, reviewDecision))
+				}
+			case "draft", "bot":
+				if _, ok := value.(bool); !ok {
+					errs = append(errs, fmt.Sprintf("views.%s.filters.%s must be a boolean", name, key))
+				}
+			default:
+				errs = append(errs, fmt.Sprintf("views.%s.filters.%s is not supported (supported filters: author, draft, bot, review_decision)", name, key))
+			}
+		}
+	}
+	return errs
+}
+
+func isValidViewAuthor(value string) bool {
+	switch value {
+	case "me", "team", "other":
+		return true
+	default:
+		return strings.HasPrefix(value, "@") && strings.TrimPrefix(value, "@") != ""
+	}
+}
+
+func isValidViewReviewDecision(value string) bool {
+	switch value {
+	case "approved", "not-approved", "review-required", "changes-requested", "none":
+		return true
+	default:
+		return false
+	}
+}
+
+func sortedViewNames(views map[string]View) []string {
+	names := make([]string, 0, len(views))
+	for name := range views {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func sortedMapKeys(values map[string]interface{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // LoadDefault returns the default configuration without reading any files.
