@@ -100,6 +100,20 @@ Pitfalls to avoid
 ## Issue Tracking with Beads
 We use beads for issue tracking and work planning. If you need more information, execute `bd quickstart`
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in Beads via the `br` CLI, with issue data stored under `.beads/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage roles use the default Beads label strings: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo: read root `CONTEXT.md` and root `docs/adr/` when present. See `docs/agents/domain.md`.
+
 ## Testing Requirements
 Write tests for any changes made in this codebase. All code must build successfully, pass linting, and all tests must pass before marking a bead as closed.
 

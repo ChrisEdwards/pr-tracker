@@ -10,6 +10,9 @@ daemon.lock
 daemon.log
 daemon.pid
 bd.sock
+.br_history/
+.sync.lock
+last-touched
 
 # Local version tracking (prevents upgrade notification spam after git ops)
 .local_version
