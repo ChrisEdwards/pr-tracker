@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-10
+
+### Added
+
+- Composable PR filters and views for the CLI
+
+### Changed
+
+- Cleaned JSON output structure with accurate PR counts
+- Cleaned up golangci findings
+
+### Fixed
+
+- Resolve cycle errors in `--json` output
+- Apply `show_other_prs` filtering to JSON output
+- Filter repositories in JSON output to match CLI output
+- Remove duplicate PR data from stacks and repositories
+- Add trailing newline to JSON output
+
+### Documentation
+
+- Use space-separated flag examples in CLI docs
+- Add PR filter view planning beads
+
 ## [0.5.0] - 2025-12-22
 
 ### Added
@@ -81,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON output for scripting with jq
 - Interactive setup wizard on first run
 
-[Unreleased]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ChrisEdwards/pr-tracker/compare/v0.2.0...v0.3.0
