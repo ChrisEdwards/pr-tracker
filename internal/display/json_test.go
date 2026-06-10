@@ -243,7 +243,9 @@ func TestRenderJSON_AllFieldsPresent(t *testing.T) {
 	var count struct {
 		TotalPRs int `json:"total_prs"`
 	}
-	json.Unmarshal([]byte(output), &count)
+	if err := json.Unmarshal([]byte(output), &count); err != nil {
+		t.Fatalf("unmarshal JSON output: %v", err)
+	}
 	if count.TotalPRs != 4 {
 		t.Errorf("Expected total_prs=4, got %d", count.TotalPRs)
 	}

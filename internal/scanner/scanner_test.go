@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,6 +9,30 @@ import (
 
 	"prt/internal/config"
 )
+
+func mustRun(t *testing.T, cmd *exec.Cmd) {
+	t.Helper()
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("running %s %v: %v", cmd.Path, cmd.Args[1:], err)
+	}
+}
+
+func createGitRepo(t *testing.T, path, remote string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatalf("creating repo dir: %v", err)
+	}
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = path
+	mustRun(t, cmd)
+
+	if remote != "" {
+		cmd = exec.Command("git", "remote", "add", "origin", remote)
+		cmd.Dir = path
+		mustRun(t, cmd)
+	}
+}
 
 func TestNewScanner(t *testing.T) {
 	t.Run("valid patterns", func(t *testing.T) {
@@ -89,29 +114,11 @@ func TestScanner_Scan(t *testing.T) {
 
 	t.Run("finds git repo", func(t *testing.T) {
 		// Create temp directory structure
-		tmpDir, err := os.MkdirTemp("", "scanner-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Create a git repo with GitHub remote
 		repoPath := filepath.Join(tmpDir, "myrepo")
-		if err := os.MkdirAll(repoPath, 0755); err != nil {
-			t.Fatalf("Failed to create repo dir: %v", err)
-		}
-
-		cmd := exec.Command("git", "init")
-		cmd.Dir = repoPath
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to init git: %v", err)
-		}
-
-		cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:testorg/myrepo.git")
-		cmd.Dir = repoPath
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to add remote: %v", err)
-		}
+		createGitRepo(t, repoPath, "git@github.com:testorg/myrepo.git")
 
 		// Create scanner and scan
 		s, err := NewScanner(3, nil)
@@ -141,29 +148,11 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("respects depth limit", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "scanner-depth-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Create repo at depth 2: tmpDir/level1/myrepo
 		deepPath := filepath.Join(tmpDir, "level1", "myrepo")
-		if err := os.MkdirAll(deepPath, 0755); err != nil {
-			t.Fatalf("Failed to create deep dir: %v", err)
-		}
-
-		cmd := exec.Command("git", "init")
-		cmd.Dir = deepPath
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to init git: %v", err)
-		}
-
-		cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:org/deeprepo.git")
-		cmd.Dir = deepPath
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to add remote: %v", err)
-		}
+		createGitRepo(t, deepPath, "git@github.com:org/deeprepo.git")
 
 		// With depth 1, should not find the repo (it's at depth 2)
 		s1, _ := NewScanner(1, nil)
@@ -181,22 +170,12 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("applies filter patterns", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "scanner-filter-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Create two repos
 		for _, name := range []string{"myorg-api", "other-service"} {
 			repoPath := filepath.Join(tmpDir, name)
-			os.MkdirAll(repoPath, 0755)
-			cmd := exec.Command("git", "init")
-			cmd.Dir = repoPath
-			cmd.Run()
-			cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:org/"+name+".git")
-			cmd.Dir = repoPath
-			cmd.Run()
+			createGitRepo(t, repoPath, "git@github.com:org/"+name+".git")
 		}
 
 		// Filter for myorg-* only
@@ -212,21 +191,11 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("skips non-GitHub repos", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "scanner-nongithub-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Create a GitLab repo
 		repoPath := filepath.Join(tmpDir, "gitlab-repo")
-		os.MkdirAll(repoPath, 0755)
-		cmd := exec.Command("git", "init")
-		cmd.Dir = repoPath
-		cmd.Run()
-		cmd = exec.Command("git", "remote", "add", "origin", "git@gitlab.com:org/repo.git")
-		cmd.Dir = repoPath
-		cmd.Run()
+		createGitRepo(t, repoPath, "git@gitlab.com:org/repo.git")
 
 		s, _ := NewScanner(3, nil)
 		repos, _ := s.Scan(&config.Config{SearchPaths: []string{tmpDir}})
@@ -251,20 +220,10 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("no duplicates", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "scanner-dup-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		repoPath := filepath.Join(tmpDir, "repo")
-		os.MkdirAll(repoPath, 0755)
-		cmd := exec.Command("git", "init")
-		cmd.Dir = repoPath
-		cmd.Run()
-		cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:org/repo.git")
-		cmd.Dir = repoPath
-		cmd.Run()
+		createGitRepo(t, repoPath, "git@github.com:org/repo.git")
 
 		// Scan with same path twice
 		s, _ := NewScanner(3, nil)
@@ -278,21 +237,13 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("multiple search paths", func(t *testing.T) {
-		tmpDir1, _ := os.MkdirTemp("", "scanner-multi1-*")
-		tmpDir2, _ := os.MkdirTemp("", "scanner-multi2-*")
-		defer os.RemoveAll(tmpDir1)
-		defer os.RemoveAll(tmpDir2)
+		tmpDir1 := t.TempDir()
+		tmpDir2 := t.TempDir()
 
 		// Create repo in each
 		for i, dir := range []string{tmpDir1, tmpDir2} {
 			repoPath := filepath.Join(dir, "repo")
-			os.MkdirAll(repoPath, 0755)
-			cmd := exec.Command("git", "init")
-			cmd.Dir = repoPath
-			cmd.Run()
-			cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:org/repo"+string(rune('1'+i))+".git")
-			cmd.Dir = repoPath
-			cmd.Run()
+			createGitRepo(t, repoPath, fmt.Sprintf("git@github.com:org/repo%d.git", i+1))
 		}
 
 		s, _ := NewScanner(3, nil)
@@ -312,21 +263,11 @@ func TestScanWithDefaults(t *testing.T) {
 		t.Skip("git not available")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "scandefault-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Create a repo
 	repoPath := filepath.Join(tmpDir, "testrepo")
-	os.MkdirAll(repoPath, 0755)
-	cmd := exec.Command("git", "init")
-	cmd.Dir = repoPath
-	cmd.Run()
-	cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:org/testrepo.git")
-	cmd.Dir = repoPath
-	cmd.Run()
+	createGitRepo(t, repoPath, "git@github.com:org/testrepo.git")
 
 	cfg := &config.Config{
 		SearchPaths:  []string{tmpDir},

@@ -43,7 +43,11 @@ release-snapshot:
 
 ## lint: Run golangci-lint (if available)
 lint:
-	@which golangci-lint > /dev/null 2>&1 && golangci-lint run || echo "golangci-lint not installed, skipping"
+	@if command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not installed, skipping"; \
+	fi
 
 ## fmt: Format Go code
 fmt:

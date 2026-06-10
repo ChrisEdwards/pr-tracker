@@ -142,11 +142,7 @@ func TestGetRemoteURL(t *testing.T) {
 
 	t.Run("valid git repo", func(t *testing.T) {
 		// Create a temporary directory
-		tmpDir, err := os.MkdirTemp("", "git-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Initialize a git repo
 		cmd := exec.Command("git", "init")
@@ -158,10 +154,10 @@ func TestGetRemoteURL(t *testing.T) {
 		// Set up git config for the repo
 		cmd = exec.Command("git", "config", "user.email", "test@test.com")
 		cmd.Dir = tmpDir
-		_ = cmd.Run()
+		mustRun(t, cmd)
 		cmd = exec.Command("git", "config", "user.name", "Test")
 		cmd.Dir = tmpDir
-		_ = cmd.Run()
+		mustRun(t, cmd)
 
 		// Add a remote
 		testURL := "git@github.com:testowner/testrepo.git"
@@ -185,14 +181,10 @@ func TestGetRemoteURL(t *testing.T) {
 
 	t.Run("non-git directory", func(t *testing.T) {
 		// Create a temporary directory (not a git repo)
-		tmpDir, err := os.MkdirTemp("", "non-git-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Test GetRemoteURL - should fail
-		_, err = GetRemoteURL(tmpDir)
+		_, err := GetRemoteURL(tmpDir)
 		if err == nil {
 			t.Error("GetRemoteURL() expected error for non-git directory, got nil")
 		}
@@ -200,11 +192,7 @@ func TestGetRemoteURL(t *testing.T) {
 
 	t.Run("git repo without origin remote", func(t *testing.T) {
 		// Create a temporary directory
-		tmpDir, err := os.MkdirTemp("", "git-no-origin-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Initialize a git repo (but don't add origin)
 		cmd := exec.Command("git", "init")
@@ -214,7 +202,7 @@ func TestGetRemoteURL(t *testing.T) {
 		}
 
 		// Test GetRemoteURL - should fail
-		_, err = GetRemoteURL(tmpDir)
+		_, err := GetRemoteURL(tmpDir)
 		if err == nil {
 			t.Error("GetRemoteURL() expected error for repo without origin, got nil")
 		}
@@ -229,26 +217,10 @@ func TestInspectRepo(t *testing.T) {
 
 	t.Run("valid GitHub repo", func(t *testing.T) {
 		// Create a temporary directory
-		tmpDir, err := os.MkdirTemp("", "inspect-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
-		// Initialize a git repo
-		cmd := exec.Command("git", "init")
-		cmd.Dir = tmpDir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to init git repo: %v", err)
-		}
-
-		// Add a GitHub remote
 		testURL := "git@github.com:myorg/myrepo.git"
-		cmd = exec.Command("git", "remote", "add", "origin", testURL)
-		cmd.Dir = tmpDir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to add remote: %v", err)
-		}
+		createGitRepo(t, tmpDir, testURL)
 
 		// Test InspectRepo
 		repo, err := InspectRepo(tmpDir)
@@ -275,28 +247,13 @@ func TestInspectRepo(t *testing.T) {
 
 	t.Run("non-GitHub repo", func(t *testing.T) {
 		// Create a temporary directory
-		tmpDir, err := os.MkdirTemp("", "inspect-gitlab-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
-
-		// Initialize a git repo
-		cmd := exec.Command("git", "init")
-		cmd.Dir = tmpDir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to init git repo: %v", err)
-		}
+		tmpDir := t.TempDir()
 
 		// Add a GitLab remote (not GitHub)
-		cmd = exec.Command("git", "remote", "add", "origin", "git@gitlab.com:owner/repo.git")
-		cmd.Dir = tmpDir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to add remote: %v", err)
-		}
+		createGitRepo(t, tmpDir, "git@gitlab.com:owner/repo.git")
 
 		// Test InspectRepo - should fail for non-GitHub
-		_, err = InspectRepo(tmpDir)
+		_, err := InspectRepo(tmpDir)
 		if err == nil {
 			t.Error("InspectRepo() expected error for non-GitHub repo, got nil")
 		}
@@ -304,14 +261,10 @@ func TestInspectRepo(t *testing.T) {
 
 	t.Run("non-git directory", func(t *testing.T) {
 		// Create a temporary directory (not a git repo)
-		tmpDir, err := os.MkdirTemp("", "inspect-non-git-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Test InspectRepo - should fail
-		_, err = InspectRepo(tmpDir)
+		_, err := InspectRepo(tmpDir)
 		if err == nil {
 			t.Error("InspectRepo() expected error for non-git directory, got nil")
 		}

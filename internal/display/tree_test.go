@@ -174,7 +174,7 @@ func TestRenderStackTree_DeepNesting(t *testing.T) {
 		t.Fatal("expected all PR numbers to appear")
 	}
 
-	if !(rootIdx < childIdx && childIdx < grandchildIdx) {
+	if rootIdx >= childIdx || childIdx >= grandchildIdx {
 		t.Error("expected PRs to appear in tree order: root, child, grandchild")
 	}
 }

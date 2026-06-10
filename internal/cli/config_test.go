@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,24 +11,41 @@ import (
 	"prt/internal/config"
 )
 
-func TestConfigShowCmd(t *testing.T) {
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func captureStdout(t *testing.T, fn func() error) string {
+	t.Helper()
 
-	// Run command
-	err := runConfigShow(nil, nil)
+	old := os.Stdout
+	r, w, err := os.Pipe()
 	if err != nil {
-		t.Fatalf("runConfigShow() error = %v", err)
+		t.Fatalf("os.Pipe() error = %v", err)
 	}
 
-	// Restore stdout and read output
-	w.Close()
+	os.Stdout = w
+	runErr := fn()
 	os.Stdout = old
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("closing stdout pipe writer: %v", err)
+	}
+	if runErr != nil {
+		t.Fatalf("command error = %v", runErr)
+	}
+
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("reading stdout pipe: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("closing stdout pipe reader: %v", err)
+	}
+
+	return buf.String()
+}
+
+func TestConfigShowCmd(t *testing.T) {
+	output := captureStdout(t, func() error {
+		return runConfigShow(nil, nil)
+	})
 
 	// Verify output contains expected config content
 	if !strings.Contains(output, "# PRT Configuration") {
@@ -42,23 +60,9 @@ func TestConfigShowCmd(t *testing.T) {
 }
 
 func TestConfigPathCmd(t *testing.T) {
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runConfigPath(nil, nil)
-	if err != nil {
-		t.Fatalf("runConfigPath() error = %v", err)
-	}
-
-	// Restore stdout and read output
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := strings.TrimSpace(buf.String())
+	output := strings.TrimSpace(captureStdout(t, func() error {
+		return runConfigPath(nil, nil)
+	}))
 
 	// Verify output is a path ending in config.yaml
 	if !strings.HasSuffix(strings.TrimSuffix(output, " (not created yet)"), "config.yaml") {
@@ -76,21 +80,9 @@ func TestConfigPathCmd_FileNotExists(t *testing.T) {
 	// Since we can't easily mock ConfigPath, we'll just verify the behavior
 	// with the actual path
 
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runConfigPath(nil, nil)
-	if err != nil {
-		t.Fatalf("runConfigPath() error = %v", err)
-	}
-
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := captureStdout(t, func() error {
+		return runConfigPath(nil, nil)
+	})
 
 	// Output should be a valid path regardless of existence
 	if output == "" {
@@ -103,21 +95,9 @@ func TestConfigEdit_EditorEnvVar(t *testing.T) {
 	// We can't actually run the editor in tests, but we can verify
 	// the environment variable logic
 
-	// Test EDITOR fallback logic
-	editor := os.Getenv("EDITOR")
-	visual := os.Getenv("VISUAL")
-
 	// Clear both
-	os.Unsetenv("EDITOR")
-	os.Unsetenv("VISUAL")
-	defer func() {
-		if editor != "" {
-			os.Setenv("EDITOR", editor)
-		}
-		if visual != "" {
-			os.Setenv("VISUAL", visual)
-		}
-	}()
+	t.Setenv("EDITOR", "")
+	t.Setenv("VISUAL", "")
 
 	// Verify the default fallback behavior
 	// Since we can't run the editor, just verify the logic path

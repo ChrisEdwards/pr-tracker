@@ -140,14 +140,14 @@ func (s *Spinner) render() {
 	// Pad with spaces to clear any previous longer content
 	line += "          "
 
-	fmt.Fprint(s.writer, line)
+	_, _ = fmt.Fprint(s.writer, line)
 }
 
 // clearLine clears the current line.
 func (s *Spinner) clearLine() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	fmt.Fprint(s.writer, "\r\033[K")
+	_, _ = fmt.Fprint(s.writer, "\r\033[K")
 }
 
 // IsTTY returns true if the given writer is a terminal.

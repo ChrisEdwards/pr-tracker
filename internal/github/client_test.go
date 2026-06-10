@@ -121,7 +121,9 @@ func TestCheck_VerifiesGHFirst(t *testing.T) {
 		retryer: testRetryer(),
 	}
 
-	c.Check()
+	if err := c.Check(); err == nil {
+		t.Fatal("expected error when gh not found")
+	}
 
 	if !lookPathCalled {
 		t.Error("expected execLookPath to be called")
@@ -148,7 +150,9 @@ func TestCheck_AuthCommandArgs(t *testing.T) {
 		retryer: testRetryer(),
 	}
 
-	c.Check()
+	if err := c.Check(); err != nil {
+		t.Fatalf("Check() error = %v", err)
+	}
 
 	if capturedName != "gh" {
 		t.Errorf("expected command 'gh', got %q", capturedName)
@@ -249,7 +253,9 @@ func TestGetCurrentUser_CommandArgs(t *testing.T) {
 		retryer: testRetryer(),
 	}
 
-	c.GetCurrentUser()
+	if _, err := c.GetCurrentUser(); err != nil {
+		t.Fatalf("GetCurrentUser() error = %v", err)
+	}
 
 	if capturedName != "gh" {
 		t.Errorf("expected command 'gh', got %q", capturedName)
@@ -367,7 +373,9 @@ func TestListPRs_CommandArgs(t *testing.T) {
 		retryer: testRetryer(),
 	}
 
-	c.ListPRs(".")
+	if _, err := c.ListPRs("."); err != nil {
+		t.Fatalf("ListPRs() error = %v", err)
+	}
 
 	if capturedName != "gh" {
 		t.Errorf("expected command 'gh', got %q", capturedName)

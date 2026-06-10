@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -59,29 +58,11 @@ func TestRootCmd_Metadata(t *testing.T) {
 }
 
 func TestVersionFlag(t *testing.T) {
-	// Save and restore original stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	// Set version and run with --version
 	rootCmd.Version = "1.2.3-test"
 	rootCmd.SetArgs([]string{"--version"})
-	err := rootCmd.Execute()
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	// Reset for other tests
-	rootCmd.SetArgs(nil)
-
-	if err != nil {
-		t.Fatalf("Execute() with --version returned error: %v", err)
-	}
+	defer rootCmd.SetArgs(nil)
+	output := captureStdout(t, rootCmd.Execute)
 
 	if !strings.Contains(output, "1.2.3-test") {
 		t.Errorf("version output = %q, want it to contain %q", output, "1.2.3-test")
@@ -89,28 +70,10 @@ func TestVersionFlag(t *testing.T) {
 }
 
 func TestHelpFlag(t *testing.T) {
-	// Save and restore original stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	// Run with --help
 	rootCmd.SetArgs([]string{"--help"})
-	err := rootCmd.Execute()
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	// Reset for other tests
-	rootCmd.SetArgs(nil)
-
-	if err != nil {
-		t.Fatalf("Execute() with --help returned error: %v", err)
-	}
+	defer rootCmd.SetArgs(nil)
+	output := captureStdout(t, rootCmd.Execute)
 
 	// Verify help output contains expected sections
 	expectedPhrases := []string{

@@ -75,9 +75,7 @@ type ProgressDisplay struct {
 	useASCII  bool
 
 	// PR counts for summary
-	totalPRs   int
-	yourPRs    int
-	needReview int
+	totalPRs int
 }
 
 // ProgressOption configures a ProgressDisplay.
@@ -206,7 +204,7 @@ func (p *ProgressDisplay) render() {
 	if !p.isTTY {
 		// Just print the latest result
 		if len(p.results) > 0 {
-			fmt.Fprintln(p.writer, p.results[len(p.results)-1])
+			_, _ = fmt.Fprintln(p.writer, p.results[len(p.results)-1])
 		}
 		return
 	}
@@ -241,14 +239,14 @@ func (p *ProgressDisplay) renderTTY() {
 	elapsedStr := fmt.Sprintf("%.1fs", elapsed.Seconds())
 
 	// Clear screen and move cursor to top-left
-	fmt.Fprint(p.writer, "\033[2J\033[H")
+	_, _ = fmt.Fprint(p.writer, "\033[2J\033[H")
 
 	// Header
-	fmt.Fprintf(p.writer, "%s\n\n",
+	_, _ = fmt.Fprintf(p.writer, "%s\n\n",
 		ProgressHeaderStyle.Render(fmt.Sprintf("Fetching PRs from %d repositories...", p.total)))
 
 	// Progress bar with count, percentage, and elapsed time
-	fmt.Fprintf(p.writer, "  %s  %d/%d  %s  %s\n\n",
+	_, _ = fmt.Fprintf(p.writer, "  %s  %d/%d  %s  %s\n\n",
 		ProgressBarStyle.Render(bar),
 		p.done, p.total,
 		ProgressTextStyle.Render(fmt.Sprintf("%d%%", int(pct*100))),
@@ -256,7 +254,7 @@ func (p *ProgressDisplay) renderTTY() {
 
 	// Show only the current (most recent) repo status - single line that updates in place
 	if len(p.results) > 0 {
-		fmt.Fprintf(p.writer, "  %s\n", p.results[len(p.results)-1])
+		_, _ = fmt.Fprintf(p.writer, "  %s\n", p.results[len(p.results)-1])
 	}
 }
 
@@ -295,7 +293,7 @@ func (p *ProgressDisplay) Clear() {
 	defer p.mu.Unlock()
 
 	if p.writer != nil && !p.cleared {
-		fmt.Fprint(p.writer, "\033[2J\033[H")
+		_, _ = fmt.Fprint(p.writer, "\033[2J\033[H")
 		p.cleared = true
 	}
 }

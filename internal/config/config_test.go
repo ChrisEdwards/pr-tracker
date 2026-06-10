@@ -375,8 +375,7 @@ func findSubstring(s, substr string) bool {
 
 func TestLoad_EnvOverrides(t *testing.T) {
 	// Set environment variable
-	os.Setenv("PRT_SCAN_DEPTH", "10")
-	defer os.Unsetenv("PRT_SCAN_DEPTH")
+	t.Setenv("PRT_SCAN_DEPTH", "10")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -390,8 +389,7 @@ func TestLoad_EnvOverrides(t *testing.T) {
 }
 
 func TestLoad_EnvOverrides_Username(t *testing.T) {
-	os.Setenv("PRT_GITHUB_USERNAME", "envuser")
-	defer os.Unsetenv("PRT_GITHUB_USERNAME")
+	t.Setenv("PRT_GITHUB_USERNAME", "envuser")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -405,8 +403,7 @@ func TestLoad_EnvOverrides_Username(t *testing.T) {
 
 func TestLoad_FlagsOverrideEnv(t *testing.T) {
 	// Set environment variable
-	os.Setenv("PRT_SCAN_DEPTH", "10")
-	defer os.Unsetenv("PRT_SCAN_DEPTH")
+	t.Setenv("PRT_SCAN_DEPTH", "10")
 
 	// Flags should override env
 	flags := &Flags{
@@ -429,12 +426,8 @@ func TestLoad_Precedence(t *testing.T) {
 	// We can't easily test file without more setup, but flag > env is key
 
 	// Set env
-	os.Setenv("PRT_SCAN_DEPTH", "8")
-	os.Setenv("PRT_DEFAULT_GROUP_BY", GroupByAuthor)
-	defer func() {
-		os.Unsetenv("PRT_SCAN_DEPTH")
-		os.Unsetenv("PRT_DEFAULT_GROUP_BY")
-	}()
+	t.Setenv("PRT_SCAN_DEPTH", "8")
+	t.Setenv("PRT_DEFAULT_GROUP_BY", GroupByAuthor)
 
 	// Flags override only scan_depth
 	flags := &Flags{
